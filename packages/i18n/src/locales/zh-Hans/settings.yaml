@@ -606,6 +606,9 @@ pages:
       index-tts-vllm:
         description: https://index-tts.github.io/
         title: Bilibili / IndexTTS
+      voice-clone-stack:
+        description: 本地语音克隆 / 合成服务（VCS）
+        title: Voice Clone Stack（本地）
       azure-ai-foundry:
         description: Azure AI Foundry
         title: Azure AI Foundry

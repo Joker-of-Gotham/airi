@@ -265,6 +265,232 @@ export const useProvidersStore = defineStore('providers', () => {
 
   // Centralized provider metadata with provider factory functions
   const providerMetadata: Record<string, ProviderMetadata> = {
+    'voice-clone-stack': {
+      id: 'voice-clone-stack',
+      category: 'speech',
+      tasks: ['text-to-speech', 'tts'],
+      nameKey: 'settings.pages.providers.provider.voice-clone-stack.title',
+      name: 'Voice Clone Stack',
+      descriptionKey: 'settings.pages.providers.provider.voice-clone-stack.description',
+      description: 'Local voice cloning (VCS)',
+      icon: 'i-solar:music-notes-bold-duotone',
+      defaultOptions: () => ({
+        // IMPORTANT: keep trailing slash for consistent URL joining
+        baseUrl: 'http://localhost:8000/',
+        // Optional. If your local service enables auth, fill it in settings.
+        apiKey: '',
+      }),
+      createProvider: async (config) => {
+        const normalizeString = (value: unknown) => typeof value === 'string' ? value.trim() : ''
+        const normalizeBaseUrl = (value: unknown) => {
+          let base = normalizeString(value)
+          if (base && !base.endsWith('/'))
+            base += '/'
+          return base
+        }
+        const normalizeHeaders = (value: unknown): Record<string, string> | Headers | undefined => {
+          if (!value)
+            return undefined
+          if (value instanceof Headers)
+            return value
+          // Avoid HeadersInit variants like [string, string][] which are not accepted by @xsai types here.
+          if (typeof value === 'object' && !Array.isArray(value))
+            return value as Record<string, string>
+          return undefined
+        }
+
+        const baseUrl = normalizeBaseUrl(config.baseUrl)
+        const apiKey = normalizeString(config.apiKey)
+
+        const provider: SpeechProvider = {
+          speech: (model: string) => {
+            return {
+              // @xsai/generate-speech will POST `${baseURL}audio/speech`
+              baseURL: baseUrl,
+              apiKey,
+              model,
+              // Optional: allow extra headers configured in provider config.
+              headers: normalizeHeaders(config.headers),
+            }
+          },
+        }
+
+        return provider
+      },
+      capabilities: {
+        listModels: async (config) => {
+          const normalizeString = (value: unknown) => typeof value === 'string' ? value.trim() : ''
+          const normalizeBaseUrl = (value: unknown) => {
+            let base = normalizeString(value)
+            if (base && !base.endsWith('/'))
+              base += '/'
+            return base
+          }
+
+          const baseUrl = normalizeBaseUrl(config.baseUrl)
+          if (!baseUrl)
+            return []
+
+          const controller = new AbortController()
+          const timeout = setTimeout(() => controller.abort(), 5000)
+          try {
+            const res = await fetch(`${baseUrl}models`, { signal: controller.signal })
+            if (!res.ok)
+              throw new Error(`Failed to fetch models: ${res.status} ${res.statusText}`)
+
+            const json = await res.json().catch(() => ({} as any))
+            const items = Array.isArray(json?.data) ? json.data : []
+
+            return items
+              .filter((m: any) => m && typeof m.id === 'string')
+              .map((m: any) => ({
+                id: m.id,
+                name: m.id,
+                provider: 'voice-clone-stack',
+                description: m.owned_by ? `owned_by: ${String(m.owned_by)}` : '',
+                contextLength: 0,
+                deprecated: false,
+              } satisfies ModelInfo))
+          }
+          finally {
+            clearTimeout(timeout)
+          }
+        },
+        listVoices: async (config) => {
+          const normalizeString = (value: unknown) => typeof value === 'string' ? value.trim() : ''
+          const normalizeBaseUrl = (value: unknown) => {
+            let base = normalizeString(value)
+            if (base && !base.endsWith('/'))
+              base += '/'
+            return base
+          }
+          const joinUrl = (base: string, path: string) => {
+            if (!path)
+              return ''
+            if (/^https?:\/\//.test(path))
+              return path
+            const safeBase = base.endsWith('/') ? base.slice(0, -1) : base
+            const safePath = path.startsWith('/') ? path : `/${path}`
+            return `${safeBase}${safePath}`
+          }
+          const languageTitle = (code: string) => ({
+            zh: 'Chinese',
+            en: 'English',
+            ja: 'Japanese',
+          } as Record<string, string>)[code] || code
+
+          const baseUrl = normalizeBaseUrl(config.baseUrl)
+          if (!baseUrl)
+            return []
+
+          const controller = new AbortController()
+          const timeout = setTimeout(() => controller.abort(), 5000)
+          try {
+            const res = await fetch(`${baseUrl}audio/voices`, { signal: controller.signal })
+            if (!res.ok)
+              throw new Error(`Failed to fetch voices: ${res.status} ${res.statusText}`)
+
+            const items = await res.json().catch(() => [] as any)
+            const voices = Array.isArray(items) ? items : []
+
+            return voices
+              .filter((v: any) => v && typeof v.id === 'string')
+              .map((v: any) => {
+                const langs = Array.isArray(v.languages) ? v.languages.filter((x: any) => typeof x === 'string') : []
+                return {
+                  id: v.id,
+                  name: typeof v.name === 'string' && v.name.trim() ? v.name : v.id,
+                  provider: 'voice-clone-stack',
+                  previewURL: typeof v.preview_url === 'string' ? joinUrl(baseUrl, v.preview_url) : undefined,
+                  description: typeof v.prompts_count === 'number' ? `prompts: ${v.prompts_count}` : undefined,
+                  languages: langs.map((code: string) => ({ code, title: languageTitle(code) })),
+                } satisfies VoiceInfo
+              })
+          }
+          finally {
+            clearTimeout(timeout)
+          }
+        },
+      },
+      validators: {
+        validateProviderConfig: async (config) => {
+          const normalizeString = (value: unknown) => typeof value === 'string' ? value.trim() : ''
+          const normalizeBaseUrl = (value: unknown) => {
+            let base = normalizeString(value)
+            if (base && !base.endsWith('/'))
+              base += '/'
+            return base
+          }
+
+          const baseUrl = normalizeBaseUrl(config.baseUrl)
+          if (!baseUrl) {
+            return {
+              errors: [new Error('Base URL is required.')],
+              reason: 'Base URL is required. Default to http://localhost:8000/',
+              valid: false,
+            }
+          }
+
+          try {
+            // Ensure absolute URL
+            if (new URL(baseUrl).host.length === 0) {
+              return {
+                errors: [new Error('Base URL is not absolute. Try to include a scheme (http:// or https://).')],
+                reason: 'Base URL is not absolute.',
+                valid: false,
+              }
+            }
+          }
+          catch {
+            return {
+              errors: [new Error('Base URL is invalid. It must be an absolute URL.')],
+              reason: 'Base URL is invalid.',
+              valid: false,
+            }
+          }
+
+          // Fast health check (2s)
+          const controller = new AbortController()
+          const timeout = setTimeout(() => controller.abort(), 2000)
+          try {
+            const res = await fetch(`${baseUrl}health`, { signal: controller.signal })
+            if (!res.ok) {
+              return {
+                errors: [new Error(`Health check failed: ${res.status} ${res.statusText}`)],
+                reason: `Health check failed: ${res.status} ${res.statusText}`,
+                valid: false,
+              }
+            }
+
+            const json = await res.json().catch(() => ({} as any))
+            const ok = json?.status === 'ok' || json?.status === 'degraded'
+            if (!ok) {
+              return {
+                errors: [new Error('Health check failed: unexpected response body')],
+                reason: 'Health check failed: unexpected response body',
+                valid: false,
+              }
+            }
+
+            return {
+              errors: [],
+              reason: '',
+              valid: true,
+            }
+          }
+          catch (e) {
+            return {
+              errors: [e as any],
+              reason: `Failed to reach Voice Clone Stack service: ${String((e as Error)?.message || e)}`,
+              valid: false,
+            }
+          }
+          finally {
+            clearTimeout(timeout)
+          }
+        },
+      },
+    },
     'openrouter-ai': buildOpenAICompatibleProvider({
       id: 'openrouter-ai',
       name: 'OpenRouter',
