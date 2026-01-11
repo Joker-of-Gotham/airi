@@ -26,7 +26,6 @@ describe('tools mcp schema', () => {
     const callTool = tools.find(entry => entry.function.name === 'mcp_call_tool')
 
     expect(callTool).toBeDefined()
-
     // Avoid unsafe optional chaining: we want the test to fail with a clear assertion
     // instead of throwing TypeError on deep property access.
     const schema = callTool!.function.parameters as JsonSchema
