@@ -5,7 +5,7 @@ import type { StreamTranscriptionResult, StreamTranscriptionOptions as XSAIStrea
 import { tryCatch } from '@moeru/std'
 import { generateTranscription } from '@xsai/generate-transcription'
 import { defineStore, storeToRefs } from 'pinia'
-import { computed, ref, shallowRef } from 'vue'
+import { computed, ref, shallowRef, watch } from 'vue'
 
 import vadWorkletUrl from '../../workers/vad/process.worklet?worker&url'
 
@@ -25,7 +25,8 @@ export interface StreamTranscriptionStreamInputOptions extends Omit<XSAIStreamTr
 export type StreamTranscription = (options: WithUnknown<StreamTranscriptionFileInputOptions | StreamTranscriptionStreamInputOptions>) => StreamTranscriptionResult
 
 type GenerateTranscriptionResponse = Awaited<ReturnType<typeof generateTranscription>>
-type HearingTranscriptionGenerateResult = GenerateTranscriptionResponse & { mode: 'generate' }
+type TranscriptionResponseFormat = 'json' | 'verbose_json' | 'text'
+type HearingTranscriptionGenerateResult = (GenerateTranscriptionResponse & { mode: 'generate', responseFormat: Exclude<TranscriptionResponseFormat, 'text'> }) | { mode: 'generate', responseFormat: 'text', text: string }
 type HearingTranscriptionStreamResult = StreamTranscriptionResult & { mode: 'stream' }
 export type HearingTranscriptionResult = HearingTranscriptionGenerateResult | HearingTranscriptionStreamResult
 
@@ -36,6 +37,12 @@ type HearingTranscriptionInput = File | {
 
 interface HearingTranscriptionInvokeOptions {
   providerOptions?: Record<string, unknown>
+  /**
+   * Hint language for STT backend. Common values:
+   * - 'auto'
+   * - 'zh' | 'en' | 'ja'
+   */
+  language?: string
 }
 
 const STREAM_TRANSCRIPTION_EXECUTORS: Record<string, StreamTranscription> = {
@@ -78,6 +85,15 @@ export const useHearingStore = defineStore('hearing-store', () => {
     }
   }
 
+  // Keep provider model list fresh when user switches provider in Hearing settings UI.
+  watch(activeTranscriptionProvider, async (providerId) => {
+    if (providerId) {
+      // Persist provider selection so it doesn't disappear from the Hearing page selector.
+      providersStore.markProviderAdded(providerId)
+      await loadModelsForProvider(providerId)
+    }
+  }, { immediate: true })
+
   async function getModelsForProvider(provider: string) {
     if (provider && providersStore.getProviderMetadata(provider)?.capabilities.listModels !== undefined) {
       return providersStore.getModelsForProvider(provider)
@@ -102,7 +118,7 @@ export const useHearingStore = defineStore('hearing-store', () => {
     provider: TranscriptionProviderWithExtraOptions<string, any>,
     model: string,
     input: HearingTranscriptionInput,
-    format?: 'json' | 'verbose_json',
+    format?: TranscriptionResponseFormat,
     options?: HearingTranscriptionInvokeOptions,
   ): Promise<HearingTranscriptionResult> {
     const normalizedInput = (input instanceof File ? { file: input } : input ?? {}) as {
@@ -160,14 +176,86 @@ export const useHearingStore = defineStore('hearing-store', () => {
       throw new Error('File input is required for transcription.')
     }
 
+    const resolvedFormat: TranscriptionResponseFormat = format || 'json'
+
+    // NOTE: @xsai/generate-transcription currently supports only json / verbose_json.
+    // For response_format=text (VCS contract), we do a minimal multipart request manually,
+    // still using the provider's baseURL / headers / apiKey and returning a compatible shape.
+    if (resolvedFormat === 'text') {
+      const request = provider.transcription(model, options?.providerOptions) as {
+        baseURL: string | URL
+        apiKey?: string
+        headers?: Headers | Record<string, string>
+        fetch?: typeof globalThis.fetch
+      }
+
+      const baseURL = request.baseURL
+      const url = typeof baseURL === 'string'
+        ? `${baseURL}audio/transcriptions`
+        : new URL('audio/transcriptions', baseURL).toString()
+
+      const formData = new FormData()
+      formData.append('file', normalizedInput.file, (normalizedInput.file as any).name || 'audio.wav')
+      formData.append('model', model)
+      if (options?.language)
+        formData.append('language', options.language)
+      formData.append('response_format', 'text')
+
+      const fetchImpl = request.fetch || globalThis.fetch
+      const headers: Record<string, string> = {}
+      if (request.headers instanceof Headers) {
+        request.headers.forEach((value, key) => {
+          // Avoid forcing content-type for multipart
+          if (key.toLowerCase() !== 'content-type')
+            headers[key] = value
+        })
+      }
+      else if (request.headers && typeof request.headers === 'object') {
+        for (const [k, v] of Object.entries(request.headers)) {
+          if (k.toLowerCase() !== 'content-type')
+            headers[k] = v
+        }
+      }
+      if (request.apiKey)
+        headers.Authorization = `Bearer ${request.apiKey}`
+
+      const abortSignal = (options?.providerOptions as any)?.abortSignal as AbortSignal | undefined
+
+      const res = await fetchImpl(url as any, {
+        method: 'POST',
+        headers,
+        body: formData,
+        signal: abortSignal,
+      })
+
+      if (!res.ok) {
+        const ct = (res.headers.get('content-type') || '').toLowerCase()
+        if (ct.includes('application/json')) {
+          const err = await res.json().catch(() => ({} as any))
+          throw new Error(err?.error?.message || `HTTP ${res.status} ${res.statusText}`)
+        }
+        const detail = await res.text().catch(() => '')
+        throw new Error(detail || `HTTP ${res.status} ${res.statusText}`)
+      }
+
+      const text = await res.text()
+      return {
+        mode: 'generate',
+        responseFormat: 'text',
+        text,
+      }
+    }
+
     const response = await generateTranscription({
-      ...provider.transcription(model, options?.providerOptions),
+      ...(provider.transcription(model, options?.providerOptions) as any),
       file: normalizedInput.file,
-      responseFormat: format,
-    })
+      language: options?.language,
+      responseFormat: resolvedFormat === 'verbose_json' ? 'verbose_json' : 'json',
+    } as any)
 
     return {
       mode: 'generate',
+      responseFormat: resolvedFormat === 'verbose_json' ? 'verbose_json' : 'json',
       ...response,
     }
   }

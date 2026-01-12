@@ -635,6 +635,9 @@ pages:
       voice-clone-stack:
         description: Local voice cloning / TTS service (VCS)
         title: Voice Clone Stack (Local)
+      voice-clone-stack-transcription:
+        description: Local speech-to-text service (VCS)
+        title: Voice Clone Stack (Local Transcription)
       azure-ai-foundry:
         description: Azure AI Foundry
         title: Azure AI Foundry
@@ -712,6 +715,25 @@ pages:
       transcriptions:
         playground:
           title: Transcription Playground
+          audio_input_device:
+            label: Audio Input Device
+            description: Select the audio input device for your hearing module.
+            placeholder: Select an audio input device
+          language:
+            label: Language
+            description: Hint language for the STT backend (use Auto if unsure).
+            options:
+              auto: Auto
+              zh: Chinese (zh)
+              en: English (en)
+              ja: Japanese (ja)
+          response_format:
+            label: Response Format
+            description: Return format from backend (verbose_json includes segments/words).
+            options:
+              json: json
+              verbose_json: verbose_json
+              text: text
     title: Providers
   scene:
     description: Configure the environment where the character lives

@@ -22,7 +22,10 @@ const defaultModel = 'whisper-1'
 const apiKeyConfigured = computed(() => !!providers.value[providerId]?.apiKey)
 
 // Generate speech with ElevenLabs-specific parameters
-async function handleGenerateTranscription(file: File) {
+async function handleGenerateTranscription(
+  file: File,
+  options?: { language?: string, responseFormat?: 'json' | 'verbose_json' | 'text' },
+) {
   const provider = await providersStore.getProviderInstance<TranscriptionProviderWithExtraOptions<string, any>>(providerId)
   if (!provider) {
     throw new Error('Failed to initialize speech provider')
@@ -40,7 +43,10 @@ async function handleGenerateTranscription(file: File) {
     provider,
     model,
     file,
-    'json',
+    options?.responseFormat || 'json',
+    {
+      language: options?.language,
+    },
   )
 }
 </script>

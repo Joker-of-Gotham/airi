@@ -13,7 +13,7 @@ import { LevelMeter, TestDummyMarker, ThresholdMeter } from '../../gadgets'
 
 const props = defineProps<{
   // Provider-specific handlers (provided from parent)
-  generateTranscription: (input: File) => Promise<HearingTranscriptionResult>
+  generateTranscription: (input: File, options?: { language?: string, responseFormat?: 'json' | 'verbose_json' | 'text' }) => Promise<HearingTranscriptionResult>
   // Current state
   apiKeyConfigured?: boolean
 }>()
@@ -33,16 +33,25 @@ const audioContext = shallowRef<AudioContext>()
 const dataArray = ref<Uint8Array<ArrayBuffer>>()
 const animationFrame = ref<number>()
 
-const audios = ref<Blob[]>([])
-const audioCleanups = ref<(() => void)[]>([])
-const audioURLs = computed(() => {
-  return audios.value.map((blob) => {
-    const url = URL.createObjectURL(blob)
-    audioCleanups.value.push(() => URL.revokeObjectURL(url))
-    return url
-  })
+// Keep only ONE latest recording + transcription in the playground (no history list)
+const audioBlob = shallowRef<Blob>()
+const audioUrl = ref<string>('')
+const transcriptionText = ref<string>('')
+
+watch(audioBlob, (blob, _old, onCleanup) => {
+  if (audioUrl.value) {
+    URL.revokeObjectURL(audioUrl.value)
+    audioUrl.value = ''
+  }
+  if (!blob)
+    return
+  const url = URL.createObjectURL(blob)
+  audioUrl.value = url
+  onCleanup(() => URL.revokeObjectURL(url))
 })
-const transcriptions = ref<string[]>([])
+
+const selectedLanguage = ref<'auto' | 'zh' | 'en' | 'ja'>('auto')
+const responseFormat = ref<'json' | 'verbose_json' | 'text'>('json')
 
 watch(selectedAudioInput, async () => {
   if (isMonitoring.value) {
@@ -105,12 +114,18 @@ async function stopAudioMonitoring() {
 onStopRecord(async (recording) => {
   try {
     if (recording && recording.size > 0) {
-      audios.value.push(recording)
-      const result = await props.generateTranscription(new File([recording], 'recording.wav'))
+      audioBlob.value = recording
+      const result = await props.generateTranscription(
+        new File([recording], 'recording.wav'),
+        {
+          language: selectedLanguage.value === 'auto' ? 'auto' : selectedLanguage.value,
+          responseFormat: responseFormat.value,
+        },
+      )
       const text = result.mode === 'stream'
         ? await result.text
         : result.text
-      transcriptions.value.push(text)
+      transcriptionText.value = text
     }
   }
   catch (err) {
@@ -127,9 +142,8 @@ async function toggleMonitoring() {
     isMonitoring.value = true
   }
   else {
+    // stopAudioMonitoring already calls stopRecord internally
     await stopAudioMonitoring()
-    await stopRecord()
-
     isMonitoring.value = false
   }
 }
@@ -144,6 +158,10 @@ const speakingIndicatorClass = computed(() => {
 
 onUnmounted(() => {
   stopAudioMonitoring()
+  if (audioUrl.value) {
+    URL.revokeObjectURL(audioUrl.value)
+    audioUrl.value = ''
+  }
 })
 </script>
 
@@ -158,17 +176,45 @@ onUnmounted(() => {
       </div>
     </h2>
 
+    <div mb-2 grid="~ cols-1 md:cols-2 gap-3">
+      <FieldSelect
+        v-model="selectedLanguage"
+        :label="t('settings.pages.providers.provider.transcriptions.playground.language.label')"
+        :description="t('settings.pages.providers.provider.transcriptions.playground.language.description')"
+        :options="[
+          { label: t('settings.pages.providers.provider.transcriptions.playground.language.options.auto'), value: 'auto' },
+          { label: t('settings.pages.providers.provider.transcriptions.playground.language.options.zh'), value: 'zh' },
+          { label: t('settings.pages.providers.provider.transcriptions.playground.language.options.en'), value: 'en' },
+          { label: t('settings.pages.providers.provider.transcriptions.playground.language.options.ja'), value: 'ja' },
+        ]"
+        layout="vertical"
+        h-fit w-full
+      />
+      <FieldSelect
+        v-model="responseFormat"
+        :label="t('settings.pages.providers.provider.transcriptions.playground.response_format.label')"
+        :description="t('settings.pages.providers.provider.transcriptions.playground.response_format.description')"
+        :options="[
+          { label: t('settings.pages.providers.provider.transcriptions.playground.response_format.options.json'), value: 'json' },
+          { label: t('settings.pages.providers.provider.transcriptions.playground.response_format.options.verbose_json'), value: 'verbose_json' },
+          { label: t('settings.pages.providers.provider.transcriptions.playground.response_format.options.text'), value: 'text' },
+        ]"
+        layout="vertical"
+        h-fit w-full
+      />
+    </div>
+
     <!-- Audio Input Selection -->
     <div mb-2>
       <FieldSelect
         v-model="selectedAudioInput"
-        label="Audio Input Device"
-        description="Select the audio input device for your hearing module."
+        :label="t('settings.pages.providers.provider.transcriptions.playground.audio_input_device.label')"
+        :description="t('settings.pages.providers.provider.transcriptions.playground.audio_input_device.description')"
         :options="audioInputs.map(input => ({
           label: input.label || input.deviceId,
           value: input.deviceId,
         }))"
-        placeholder="Select an audio input device"
+        :placeholder="t('settings.pages.providers.provider.transcriptions.playground.audio_input_device.placeholder')"
         layout="vertical"
         h-fit w-full
       />
@@ -179,11 +225,9 @@ onUnmounted(() => {
     </Button>
 
     <div>
-      <div v-for="(audio, index) in audioURLs" :key="index" class="mb-2">
-        <audio :src="audio" controls class="w-full" />
-        <div v-if="transcriptions[index]" class="mt-2 text-sm text-neutral-500 dark:text-neutral-400">
-          {{ transcriptions[index] }}
-        </div>
+      <audio v-if="audioUrl" :src="audioUrl" controls class="mb-2 w-full" />
+      <div v-if="transcriptionText" class="mt-2 text-sm text-neutral-500 dark:text-neutral-400">
+        {{ transcriptionText }}
       </div>
     </div>
 

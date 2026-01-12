@@ -219,6 +219,13 @@ export const useProvidersStore = defineStore('providers', () => {
   const addedProviders = useLocalStorage<Record<string, boolean>>('settings/providers/added', {})
   const providerInstanceCache = ref<Record<string, unknown>>({})
   const { t } = useI18n()
+
+  const normalizeBaseUrl = (value: unknown) => {
+    const raw = typeof value === 'string' ? value.trim() : ''
+    if (!raw)
+      return ''
+    return raw.endsWith('/') ? raw : `${raw}/`
+  }
   const baseUrlValidator = computed(() => (baseUrl: unknown) => {
     let msg = ''
     if (!baseUrl) {
@@ -450,6 +457,218 @@ export const useProvidersStore = defineStore('providers', () => {
           }
 
           // Fast health check (2s)
+          const controller = new AbortController()
+          const timeout = setTimeout(() => controller.abort(), 2000)
+          try {
+            const res = await fetch(`${baseUrl}health`, { signal: controller.signal })
+            if (!res.ok) {
+              return {
+                errors: [new Error(`Health check failed: ${res.status} ${res.statusText}`)],
+                reason: `Health check failed: ${res.status} ${res.statusText}`,
+                valid: false,
+              }
+            }
+
+            const json = await res.json().catch(() => ({} as any))
+            const ok = json?.status === 'ok' || json?.status === 'degraded'
+            if (!ok) {
+              return {
+                errors: [new Error('Health check failed: unexpected response body')],
+                reason: 'Health check failed: unexpected response body',
+                valid: false,
+              }
+            }
+
+            return {
+              errors: [],
+              reason: '',
+              valid: true,
+            }
+          }
+          catch (e) {
+            return {
+              errors: [e as any],
+              reason: `Failed to reach Voice Clone Stack service: ${String((e as Error)?.message || e)}`,
+              valid: false,
+            }
+          }
+          finally {
+            clearTimeout(timeout)
+          }
+        },
+      },
+    },
+    'voice-clone-stack-transcription': {
+      id: 'voice-clone-stack-transcription',
+      category: 'transcription',
+      tasks: ['speech-to-text', 'automatic-speech-recognition', 'asr', 'stt'],
+      nameKey: 'settings.pages.providers.provider.voice-clone-stack-transcription.title',
+      name: 'Voice Clone Stack (Local STT)',
+      descriptionKey: 'settings.pages.providers.provider.voice-clone-stack-transcription.description',
+      description: 'Local speech-to-text via Voice Clone Stack (VCS)',
+      icon: 'i-solar:microphone-3-bold-duotone',
+      transcriptionFeatures: {
+        supportsGenerate: true,
+        supportsStreamOutput: false,
+        supportsStreamInput: false,
+      },
+      defaultOptions: () => ({
+        // IMPORTANT: keep trailing slash for consistent URL joining
+        baseUrl: 'http://localhost:8000/',
+        // Optional. If your local service enables auth, fill it in settings.
+        apiKey: '',
+      }),
+      createProvider: async (config) => {
+        const normalizeString = (value: unknown) => typeof value === 'string' ? value.trim() : ''
+        const normalizeBaseUrl = (value: unknown) => {
+          let base = normalizeString(value)
+          if (base && !base.endsWith('/'))
+            base += '/'
+          return base
+        }
+        const normalizeHeaders = (value: unknown): Record<string, string> | Headers | undefined => {
+          if (!value)
+            return undefined
+          if (value instanceof Headers)
+            return value
+          if (typeof value === 'object' && !Array.isArray(value))
+            return value as Record<string, string>
+          return undefined
+        }
+
+        const baseUrl = normalizeBaseUrl(config.baseUrl)
+        const apiKey = normalizeString(config.apiKey)
+
+        const provider: TranscriptionProvider = {
+          transcription: (model: string) => {
+            return {
+              // @xsai/generate-transcription will POST `${baseURL}audio/transcriptions`
+              baseURL: baseUrl,
+              apiKey,
+              model,
+              headers: normalizeHeaders(config.headers),
+            }
+          },
+        }
+
+        return provider
+      },
+      capabilities: {
+        listModels: async (config) => {
+          const normalizeString = (value: unknown) => typeof value === 'string' ? value.trim() : ''
+          const normalizeBaseUrl = (value: unknown) => {
+            let base = normalizeString(value)
+            if (base && !base.endsWith('/'))
+              base += '/'
+            return base
+          }
+
+          const baseUrl = normalizeBaseUrl(config.baseUrl)
+          if (!baseUrl)
+            return []
+
+          const controller = new AbortController()
+          const timeout = setTimeout(() => controller.abort(), 5000)
+          try {
+            // Prefer the explicit STT model list endpoint if available.
+            // VCS contract: GET /api/stt/models
+            const res = await fetch(`${baseUrl}api/stt/models`, { signal: controller.signal })
+            if (!res.ok) {
+              // Fallback: some deployments may expose OpenAI-like /models
+              const fallback = await fetch(`${baseUrl}models`, { signal: controller.signal }).catch(() => null)
+              if (!fallback || !fallback.ok)
+                throw new Error(`Failed to fetch models: ${res.status} ${res.statusText}`)
+
+              const json = await fallback.json().catch(() => ({} as any))
+              const items = Array.isArray(json?.data) ? json.data : []
+              return items
+                .filter((m: any) => m && typeof m.id === 'string')
+                .map((m: any) => ({
+                  id: m.id,
+                  name: m.id,
+                  provider: 'voice-clone-stack-transcription',
+                  description: m.owned_by ? `owned_by: ${String(m.owned_by)}` : '',
+                  contextLength: 0,
+                  deprecated: false,
+                } satisfies ModelInfo))
+            }
+
+            const json = await res.json().catch(() => ({} as any))
+            const items: any[] = Array.isArray(json?.data)
+              ? json.data
+              : Array.isArray(json?.models)
+                ? json.models
+                : Array.isArray(json)
+                  ? json
+                  : []
+
+            return items
+              .map((m: any) => {
+                if (typeof m === 'string') {
+                  return {
+                    id: m,
+                    name: m,
+                    provider: 'voice-clone-stack-transcription',
+                    description: '',
+                    contextLength: 0,
+                    deprecated: false,
+                  } satisfies ModelInfo
+                }
+                if (m && typeof m.id === 'string') {
+                  return {
+                    id: m.id,
+                    name: typeof m.name === 'string' && m.name.trim() ? m.name : m.id,
+                    provider: 'voice-clone-stack-transcription',
+                    description: typeof m.description === 'string' ? m.description : '',
+                    contextLength: 0,
+                    deprecated: false,
+                  } satisfies ModelInfo
+                }
+                return null
+              })
+              .filter(Boolean) as ModelInfo[]
+          }
+          finally {
+            clearTimeout(timeout)
+          }
+        },
+      },
+      validators: {
+        validateProviderConfig: async (config) => {
+          const normalizeString = (value: unknown) => typeof value === 'string' ? value.trim() : ''
+          const normalizeBaseUrl = (value: unknown) => {
+            let base = normalizeString(value)
+            if (base && !base.endsWith('/'))
+              base += '/'
+            return base
+          }
+
+          const baseUrl = normalizeBaseUrl(config.baseUrl)
+          if (!baseUrl) {
+            return {
+              errors: [new Error('Base URL is required.')],
+              reason: 'Base URL is required. Default to http://localhost:8000/',
+              valid: false,
+            }
+          }
+
+          try {
+            if (new URL(baseUrl).host.length === 0) {
+              return {
+                errors: [new Error('Base URL is not absolute. Try to include a scheme (http:// or https://).')],
+                reason: 'Base URL is not absolute.',
+                valid: false,
+              }
+            }
+          }
+          catch {
+            return {
+              errors: [new Error('Base URL is invalid. It must be an absolute URL.')],
+              reason: 'Base URL is invalid.',
+              valid: false,
+            }
+          }
+
           const controller = new AbortController()
           const timeout = setTimeout(() => controller.abort(), 2000)
           try {
@@ -2276,6 +2495,21 @@ export const useProvidersStore = defineStore('providers', () => {
 
   // Call initially and watch for changes
   watch(providerCredentials, updateConfigurationStatus, { deep: true, immediate: true })
+
+  // Keep VCS STT baseUrl synced with VCS TTS baseUrl, so users don't need to input twice.
+  // This also prevents mismatched ports when VCS auto-switches ports.
+  watch(
+    () => providerCredentials.value['voice-clone-stack']?.baseUrl,
+    (baseUrl) => {
+      const normalized = normalizeBaseUrl(baseUrl)
+      if (!normalized)
+        return
+
+      providerCredentials.value['voice-clone-stack-transcription'] ??= getDefaultProviderConfig('voice-clone-stack-transcription')
+      providerCredentials.value['voice-clone-stack-transcription'].baseUrl = normalized
+    },
+    { immediate: true },
+  )
 
   // Available providers (only those that are properly configured)
   const availableProviders = computed(() => Object.keys(providerMetadata).filter(providerId => providerRuntimeState.value[providerId]?.isConfigured))

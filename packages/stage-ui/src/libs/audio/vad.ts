@@ -86,7 +86,9 @@ export function createVADStates(vad: BaseVAD, vadAudioWorkletUrl: string, option
       audioWorkletNode.port.onmessage = async (event) => {
         const { buffer } = event.data
         if (buffer && buffer.length > 0) {
-          await vad.processAudio(new Float32Array(buffer))
+          // Worklet already resamples and emits fixed 16k/512 frames.
+          const input = buffer instanceof Float32Array ? buffer : new Float32Array(buffer)
+          await vad.processAudio(input)
         }
       }
     }

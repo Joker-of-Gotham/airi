@@ -152,17 +152,18 @@ onUnmounted(() => {
   }
 })
 
-function updateCustomVoiceName(value: string | undefined) {
-  if (!value) {
+function updateCustomVoiceName(value: string | number | undefined) {
+  if (value == null || value === '') {
     activeSpeechVoice.value = undefined
     return
   }
 
+  const normalized = typeof value === 'number' ? String(value) : value
   activeSpeechVoice.value = {
-    id: value,
-    name: value,
-    description: value,
-    previewURL: value,
+    id: normalized,
+    name: normalized,
+    description: normalized,
+    previewURL: normalized,
     languages: [{ code: 'en', title: 'English' }],
     provider: activeSpeechProvider.value,
     gender: 'male',

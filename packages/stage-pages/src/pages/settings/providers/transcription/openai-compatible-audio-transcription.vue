@@ -56,7 +56,10 @@ const model = computed({
 const apiKeyConfigured = computed(() => !!providers.value[providerId]?.apiKey)
 
 // Generate transcription
-async function handleGenerateTranscription(file: File) {
+async function handleGenerateTranscription(
+  file: File,
+  options?: { language?: string, responseFormat?: 'json' | 'verbose_json' | 'text' },
+) {
   const provider = await providersStore.getProviderInstance<TranscriptionProviderWithExtraOptions<string, any>>(providerId)
   if (!provider)
     throw new Error('Failed to initialize transcription provider')
@@ -66,7 +69,10 @@ async function handleGenerateTranscription(file: File) {
     provider,
     model.value,
     file,
-    'json',
+    options?.responseFormat || 'json',
+    {
+      language: options?.language,
+    },
   )
 }
 

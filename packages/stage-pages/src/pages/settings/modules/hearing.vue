@@ -27,7 +27,7 @@ const {
   activeCustomModelName,
 } = storeToRefs(hearingStore)
 const providersStore = useProvidersStore()
-const { configuredTranscriptionProvidersMetadata } = storeToRefs(providersStore)
+const { configuredTranscriptionProvidersMetadata, persistedTranscriptionProvidersMetadata, allAudioTranscriptionProvidersMetadata } = storeToRefs(providersStore)
 
 const { trackProviderClick } = useAnalytics()
 const { stopStream, startStream } = useSettingsAudioDevice()
@@ -60,9 +60,23 @@ const audioURLs = computed(() => {
   })
 })
 
-const useVADThreshold = ref(0.6) // 0.1 - 0.9
+// Lower default threshold so whispering near mic can still be detected.
+const useVADThreshold = ref(0.2) // 0.1 - 0.9
 const useVADModel = ref(true) // Toggle between VAD and volume-based detection
 const shouldUseStreamInput = computed(() => supportsStreamInput.value && !!stream.value)
+
+// Provider selector should not "disappear" when validation fails or when user hasn't opened provider settings.
+// Prefer:
+// 1) configured providers (validated + ready)
+// 2) persisted providers (user has interacted with / selected before)
+// 3) all providers (fallback so user can still pick one)
+const transcriptionProviderChoices = computed(() => {
+  if (configuredTranscriptionProvidersMetadata.value.length > 0)
+    return configuredTranscriptionProvidersMetadata.value
+  if (persistedTranscriptionProvidersMetadata.value.length > 0)
+    return persistedTranscriptionProvidersMetadata.value
+  return allAudioTranscriptionProvidersMetadata.value
+})
 
 async function handleSpeechStart() {
   if (shouldUseStreamInput.value && stream.value) {
@@ -249,13 +263,13 @@ onUnmounted(() => {
         <div>
           <FieldSelect
             v-model="selectedAudioInput"
-            label="Audio Input Device"
-            description="Select the audio input device for your hearing module."
+            :label="t('settings.pages.providers.provider.transcriptions.playground.audio_input_device.label')"
+            :description="t('settings.pages.providers.provider.transcriptions.playground.audio_input_device.description')"
             :options="audioInputs.map(input => ({
               label: input.label || input.deviceId,
               value: input.deviceId,
             }))"
-            placeholder="Select an audio input device"
+            :placeholder="t('settings.pages.providers.provider.transcriptions.playground.audio_input_device.placeholder')"
             layout="vertical"
           />
         </div>
@@ -276,14 +290,14 @@ onUnmounted(() => {
             See also: https://stackoverflow.com/a/33737340
           -->
             <fieldset
-              v-if="configuredTranscriptionProvidersMetadata.length > 0"
+              v-if="transcriptionProviderChoices.length > 0"
               flex="~ row gap-4"
               :style="{ 'scrollbar-width': 'none' }"
               min-w-0 of-x-scroll scroll-smooth
               role="radiogroup"
             >
               <RadioCardSimple
-                v-for="metadata in configuredTranscriptionProvidersMetadata"
+                v-for="metadata in transcriptionProviderChoices"
                 :id="metadata.id"
                 :key="metadata.id"
                 v-model="activeTranscriptionProvider"

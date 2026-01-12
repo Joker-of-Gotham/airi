@@ -609,6 +609,9 @@ pages:
       voice-clone-stack:
         description: 本地语音克隆 / 合成服务（VCS）
         title: Voice Clone Stack（本地）
+      voice-clone-stack-transcription:
+        description: 本地语音转文本服务（VCS）
+        title: Voice Clone Stack（本地转写）
       azure-ai-foundry:
         description: Azure AI Foundry
         title: Azure AI Foundry
@@ -686,6 +689,25 @@ pages:
       transcriptions:
         playground:
           title: 实验平台
+          audio_input_device:
+            label: 音频输入设备
+            description: 选择听觉模块使用的音频输入设备
+            placeholder: 请选择音频输入设备
+          language:
+            label: 语言提示
+            description: 给语音识别服务一个语言提示（不确定请选“自动”）
+            options:
+              auto: 自动
+              zh: 中文（zh）
+              en: 英文（en）
+              ja: 日语（ja）
+          response_format:
+            label: 返回格式
+            description: 选择后端返回格式（verbose_json 会包含分段/词级信息）
+            options:
+              json: json
+              verbose_json: verbose_json
+              text: text
     title: 服务来源
   scene:
     description: 配置角色所在环境

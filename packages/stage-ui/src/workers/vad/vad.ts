@@ -21,6 +21,13 @@ export class VAD implements BaseVAD {
   private eventListeners: Partial<Record<keyof VADEvents, VADEventCallback<any>[]>> = {}
   private isReady: boolean = false
 
+  // NOTICE: Silero VAD uses LSTM with internal hidden state that accumulates over time.
+  // If the state is never reset, small biases in the input can cause the output to drift
+  // (typically decay to near-zero). We track consecutive silence frames and reset the
+  // LSTM state after prolonged silence to prevent this accumulation.
+  private consecutiveSilenceFrames: number = 0
+  private readonly STATE_RESET_SILENCE_FRAMES = 60 // ~2 seconds at 512 samples / 16kHz (~32ms per frame)
+
   constructor(userConfig: Partial<BaseVADConfig> = {}) {
     // Default configuration
     const defaultConfig: BaseVADConfig = {
@@ -38,7 +45,14 @@ export class VAD implements BaseVAD {
 
     this.buffer = new Float32Array(this.config.maxBufferDuration * this.config.sampleRate)
     this.sampleRateTensor = new Tensor('int64', [this.config.sampleRate], [])
-    this.state = new Tensor('float32', new Float32Array(2 * 1 * 128), [2, 1, 128])
+    this.state = this.createFreshState()
+  }
+
+  /**
+   * Create a fresh (zero) LSTM state tensor
+   */
+  private createFreshState(): Tensor {
+    return new Tensor('float32', new Float32Array(2 * 1 * 128), [2, 1, 128])
   }
 
   /**
@@ -196,10 +210,27 @@ export class VAD implements BaseVAD {
     this.emit('debug', { message: 'VAD score', data: { probability: speechProb } })
 
     // Apply thresholds
-    return (
+    const isSpeech = (
       speechProb > this.config.speechThreshold
       || (this.isRecording && speechProb >= this.config.exitThreshold)
     )
+
+    // NOTICE: Track consecutive silence frames and reset LSTM state after prolonged silence.
+    // This prevents the hidden state from accumulating bias that causes probability decay.
+    if (isSpeech) {
+      this.consecutiveSilenceFrames = 0
+    }
+    else {
+      this.consecutiveSilenceFrames++
+      if (this.consecutiveSilenceFrames >= this.STATE_RESET_SILENCE_FRAMES) {
+        // Reset LSTM state to prevent accumulated drift
+        this.state = this.createFreshState()
+        this.consecutiveSilenceFrames = 0
+        this.emit('debug', { message: 'VAD state reset after prolonged silence' })
+      }
+    }
+
+    return isSpeech
   }
 
   /**
@@ -250,6 +281,9 @@ export class VAD implements BaseVAD {
     this.isRecording = false
     this.postSpeechSamples = 0
     this.prevBuffers = []
+    // Also reset LSTM state to start fresh for next speech segment
+    this.state = this.createFreshState()
+    this.consecutiveSilenceFrames = 0
   }
 
   /**
