@@ -100,7 +100,7 @@ export function useAudioDevice(requestPermission: boolean = false) {
   })
 
   function askPermission() {
-    devices.ensurePermissions()
+    return devices.ensurePermissions()
       .then(() => nextTick())
       .then(() => {
         if (audioInputs.value.length > 0 && !selectedAudioInput.value) {
@@ -109,6 +109,7 @@ export function useAudioDevice(requestPermission: boolean = false) {
       })
       .catch((error) => {
         console.error('Error ensuring permissions:', error)
+        throw error // Re-throw so callers can handle the error
       })
   }
 

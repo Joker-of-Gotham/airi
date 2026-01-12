@@ -49,7 +49,7 @@ const settingsAudioDeviceStore = useSettingsAudioDevice()
 const { stream, enabled } = storeToRefs(settingsAudioDeviceStore)
 const { startRecord, stopRecord, onStopRecord } = useAudioRecorder(stream)
 const hearingPipeline = useHearingSpeechInputPipeline()
-const { transcribeForRecording, transcribeForMediaStream } = hearingPipeline
+const { transcribeForRecording } = hearingPipeline
 const { supportsStreamInput } = storeToRefs(hearingPipeline)
 const providersStore = useProvidersStore()
 const consciousnessStore = useConsciousnessStore()
@@ -118,6 +118,7 @@ async function startAudioInteraction() {
 }
 
 async function handleSpeechStart() {
+  // For streaming providers, rely on pipeline session reuse to avoid duplicate sessions.
   if (shouldUseStreamInput.value && stream.value) {
     await transcribeForMediaStream(stream.value, {
       onSentenceEnd: (delta) => {

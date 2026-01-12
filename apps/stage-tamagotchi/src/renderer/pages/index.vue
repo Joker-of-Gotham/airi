@@ -146,6 +146,7 @@ watch([isOutsideFor250Ms, isAroundWindowBorderFor250Ms, isOutsideWindow, isTrans
 
 const settingsAudioDeviceStore = useSettingsAudioDevice()
 const { stream, enabled } = storeToRefs(settingsAudioDeviceStore)
+const { askPermission } = settingsAudioDeviceStore
 const { startRecord, stopRecord, onStopRecord } = useAudioRecorder(stream)
 const hearingPipeline = useHearingSpeechInputPipeline()
 const {
@@ -255,12 +256,19 @@ async function handleSpeechEnd() {
 
 async function startAudioInteraction() {
   try {
+    console.info('[Main Page] Starting audio interaction...')
+
     // #region agent log
     fetch('http://127.0.0.1:7242/ingest/783cccc2-5b30-488c-830d-4d552308c88b', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: 'debug-session', runId: 'pre-fix', hypothesisId: 'A', location: 'apps/stage-tamagotchi/src/renderer/pages/index.vue:startAudioInteraction', message: 'startAudioInteraction enter', data: { hasStream: !!stream.value, supportsStreamInput: supportsStreamInput.value }, timestamp: Date.now() }) }).catch(() => {})
     // #endregion
-    await initVAD()
-    if (stream.value)
-      await startVAD(stream.value)
+    try {
+      await initVAD()
+      if (stream.value)
+        await startVAD(stream.value)
+    }
+    catch (err) {
+      console.warn('[Main Page] VAD initialization failed (non-critical for Web Speech API):', err)
+    }
 
     // Hook once
     stopOnStopRecord = onStopRecord(async (recording) => {
@@ -325,7 +333,9 @@ watch(enabled, async (val) => {
   // #region agent log
   fetch('http://127.0.0.1:7242/ingest/783cccc2-5b30-488c-830d-4d552308c88b', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: 'debug-session', runId: 'pre-fix', hypothesisId: 'A', location: 'apps/stage-tamagotchi/src/renderer/pages/index.vue:watch(enabled)', message: 'audio interaction enabled toggled', data: { enabled: val }, timestamp: Date.now() }) }).catch(() => {})
   // #endregion
+  console.info('[Main Page] Audio enabled changed:', val, 'stream available:', !!stream.value)
   if (val) {
+    await askPermission()
     await startAudioInteraction()
   }
   else {
