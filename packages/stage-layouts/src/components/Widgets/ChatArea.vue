@@ -79,7 +79,6 @@ async function debouncedAutoSend(text: string) {
       clearPendingAutoSend()
       return
     }
-
     const textToSend = pendingAutoSendText.value.trim()
     if (textToSend && autoSendEnabled.value) {
       try {

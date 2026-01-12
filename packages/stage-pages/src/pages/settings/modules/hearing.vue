@@ -11,7 +11,7 @@ import { useSettingsAudioDevice } from '@proj-airi/stage-ui/stores/settings'
 import { Button, FieldCheckbox, FieldInput, FieldRange, FieldSelect } from '@proj-airi/ui'
 import { until } from '@vueuse/core'
 import { storeToRefs } from 'pinia'
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 const { t } = useI18n()
@@ -477,6 +477,32 @@ onMounted(async () => {
   // Audio devices are loaded on demand when user requests them
   syncOpenAICompatibleSettings()
 })
+
+watch(selectedAudioInput, async () => isMonitoring.value && await setupAudioMonitoring())
+
+function handleStreamStartError() {
+  testTranscriptionError.value = 'Failed to start audio stream. Please check microphone permissions.'
+  testStatusMessage.value = 'Error: Failed to start audio stream'
+  isTranscribing.value = false
+  isTestingSTT.value = false
+  testStreamWasStarted.value = false
+}
+
+watch(activeTranscriptionProvider, async (provider) => {
+  if (!provider)
+    return
+
+  await hearingStore.loadModelsForProvider(provider)
+
+  // Auto-select first model for Web Speech API if no model is selected
+  if (provider === 'browser-web-speech-api' && !activeTranscriptionModel.value) {
+    const models = providerModels.value
+    if (models.length > 0) {
+      activeTranscriptionModel.value = models[0].id
+      console.info('Auto-selected Web Speech API model:', models[0].id)
+    }
+  }
+}, { immediate: true })
 
 onUnmounted(() => {
   stopSTTTest()
