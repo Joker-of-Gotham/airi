@@ -96,7 +96,13 @@ export interface IntentHandle {
   writeSpecial: (special: string) => void
   writeFlush: () => void
   end: () => void
-  cancel: (reason?: string) => void
+  /**
+   * Cancel the intent.
+   * - default (stopPlayback=true): hard cancel, interrupts playback for this intent.
+   * - stopPlayback=false: soft cancel, drop pending queued audio and stop future generation,
+   *   but do NOT interrupt the currently playing audio segment.
+   */
+  cancel: (reason?: string, options?: { stopPlayback?: boolean }) => void
   stream: ReadableStream<TextToken>
 }
 

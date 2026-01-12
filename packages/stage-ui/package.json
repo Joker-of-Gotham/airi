@@ -16,6 +16,7 @@
   },
   "exports": {
     ".": "./src/components/index.ts",
+    "./components/devtools/*": "./src/components/devtools/*",
     "./components/scenarios/settings/model-settings": "./src/components/scenarios/settings/model-settings/index.ts",
     "./components/scenes": "./src/components/scenes/index.ts",
     "./components/*": "./src/components/*.ts",
@@ -34,6 +35,8 @@
     "./workers/vad": "./src/workers/vad/index.ts",
     "./workers/*": "./src/workers/*.ts",
     "./workers": "./src/workers/index.ts",
+    "./services/speech/bus": "./src/services/speech/bus.ts",
+    "./services/voice-trace/bus": "./src/services/voice-trace/bus.ts",
     "./utils": "./src/utils/index.ts",
     "./utils/tts": "./src/utils/tts.ts",
     "./types/*": "./src/types/*.ts",

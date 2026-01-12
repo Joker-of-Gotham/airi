@@ -5,6 +5,7 @@ import Header from '@proj-airi/stage-layouts/components/Layouts/Header.vue'
 import InteractiveArea from '@proj-airi/stage-layouts/components/Layouts/InteractiveArea.vue'
 import MobileHeader from '@proj-airi/stage-layouts/components/Layouts/MobileHeader.vue'
 import MobileInteractiveArea from '@proj-airi/stage-layouts/components/Layouts/MobileInteractiveArea.vue'
+import VoiceTraceOverlay from '@proj-airi/stage-ui/components/devtools/voice-trace-overlay.vue'
 import workletUrl from '@proj-airi/stage-ui/workers/vad/process.worklet?worker&url'
 
 import { BackgroundProvider } from '@proj-airi/stage-layouts/components/Backgrounds'
@@ -12,6 +13,7 @@ import { useBackgroundThemeColor } from '@proj-airi/stage-layouts/composables/th
 import { useBackgroundStore } from '@proj-airi/stage-layouts/stores/background'
 import { WidgetStage } from '@proj-airi/stage-ui/components/scenes'
 import { useAudioRecorder } from '@proj-airi/stage-ui/composables/audio/audio-recorder'
+import { getVoiceTraceBusContext, voiceTraceLlmStartEvent } from '@proj-airi/stage-ui/services/voice-trace/bus'
 import { useVAD } from '@proj-airi/stage-ui/stores/ai/models/vad'
 import { useChatOrchestratorStore } from '@proj-airi/stage-ui/stores/chat'
 import { useLive2d } from '@proj-airi/stage-ui/stores/live2d'
@@ -19,7 +21,7 @@ import { useConsciousnessStore } from '@proj-airi/stage-ui/stores/modules/consci
 import { useHearingSpeechInputPipeline } from '@proj-airi/stage-ui/stores/modules/hearing'
 import { useProvidersStore } from '@proj-airi/stage-ui/stores/providers'
 import { useSettingsAudioDevice } from '@proj-airi/stage-ui/stores/settings'
-import { breakpointsTailwind, useBreakpoints, useMouse } from '@vueuse/core'
+import { breakpointsTailwind, useBreakpoints, useBroadcastChannel, useMouse } from '@vueuse/core'
 import { storeToRefs } from 'pinia'
 import { computed, onMounted, onUnmounted, ref, useTemplateRef, watch } from 'vue'
 
@@ -52,6 +54,12 @@ const providersStore = useProvidersStore()
 const consciousnessStore = useConsciousnessStore()
 const { activeProvider: activeChatProvider, activeModel: activeChatModel } = storeToRefs(consciousnessStore)
 const chatStore = useChatOrchestratorStore()
+const voiceTrace = getVoiceTraceBusContext()
+
+type CaptionChannelEvent
+  = | { type: 'caption-speaker', text: string }
+    | { type: 'caption-assistant', text: string }
+const { post: postCaption } = useBroadcastChannel<CaptionChannelEvent, CaptionChannelEvent>({ name: 'airi-caption-overlay' })
 
 const shouldUseStreamInput = computed(() => supportsStreamInput.value && !!stream.value)
 
@@ -81,6 +89,16 @@ async function startAudioInteraction() {
         return
 
       try {
+        postCaption({ type: 'caption-speaker', text })
+        voiceTrace.emit(voiceTraceLlmStartEvent, {
+          originId: 'stage-pocket:index',
+          at: Date.now(),
+          meta: {
+            source: 'voice',
+            providerId: activeChatProvider.value,
+            model: activeChatModel.value ?? undefined,
+          },
+        })
         const provider = await providersStore.getProviderInstance(activeChatProvider.value)
         if (!provider || !activeChatModel.value)
           return
@@ -106,8 +124,19 @@ async function handleSpeechStart() {
           return
         }
 
+        postCaption({ type: 'caption-speaker', text: finalText })
+
         void (async () => {
           try {
+            voiceTrace.emit(voiceTraceLlmStartEvent, {
+              originId: 'stage-pocket:index',
+              at: Date.now(),
+              meta: {
+                source: 'voice',
+                providerId: activeChatProvider.value,
+                model: activeChatModel.value ?? undefined,
+              },
+            })
             const provider = await providersStore.getProviderInstance(activeChatProvider.value)
             if (!provider || !activeChatModel.value)
               return
@@ -199,6 +228,7 @@ watch([stream, () => vadLoaded.value], async ([s, loaded]) => {
         <MobileInteractiveArea v-if="isMobile" @settings-open="handleSettingsOpen" />
       </div>
     </div>
+    <VoiceTraceOverlay />
   </BackgroundProvider>
 </template>
 

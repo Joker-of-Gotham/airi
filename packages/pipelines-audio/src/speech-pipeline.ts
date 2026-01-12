@@ -255,8 +255,8 @@ export function createSpeechPipeline<TAudio>(options: SpeechPipelineOptions<TAud
       end() {
         close()
       },
-      cancel(reason?: string) {
-        cancelIntent(intentId, reason)
+      cancel(reason?: string, cancelOptions?: { stopPlayback?: boolean }) {
+        cancelIntent(intentId, reason, cancelOptions)
       },
     }
 
@@ -281,7 +281,7 @@ export function createSpeechPipeline<TAudio>(options: SpeechPipelineOptions<TAud
     return handle
   }
 
-  function cancelIntent(intentId: string, reason?: string) {
+  function cancelIntent(intentId: string, reason?: string, cancelOptions?: { stopPlayback?: boolean }) {
     const intent = intents.get(intentId)
     if (!intent)
       return
@@ -290,7 +290,15 @@ export function createSpeechPipeline<TAudio>(options: SpeechPipelineOptions<TAud
     intent.closeStream()
 
     if (activeIntent?.intentId === intentId) {
-      options.playback.stopByIntent(intentId, reason ?? 'canceled')
+      const stopPlayback = cancelOptions?.stopPlayback !== false
+      if (stopPlayback) {
+        options.playback.stopByIntent(intentId, reason ?? 'canceled')
+      }
+      else {
+        // Soft cancel: keep current playback, drop queued backlog for this intent if supported.
+        // @ts-expect-error - optional method depending on playback implementation
+        options.playback.stopPendingByIntent?.(intentId, reason ?? 'canceled')
+      }
       return
     }
 

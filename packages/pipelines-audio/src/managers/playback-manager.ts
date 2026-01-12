@@ -238,6 +238,30 @@ export function createPlaybackManager<TAudio>(options: PlaybackManagerOptions<TA
     waiting.length = 0
   }
 
+  /**
+   * Stop pending (waiting) items ONLY. Does NOT interrupt currently playing audio.
+   * This is used for "soft barge-in": finish the current sentence, drop the backlog.
+   */
+  function stopPending(_reason: string) {
+    if (waiting.length === 0)
+      return
+    waiting.length = 0
+  }
+
+  function stopPendingByIntent(intentId: string, _reason: string) {
+    for (let i = waiting.length - 1; i >= 0; i -= 1) {
+      if (waiting[i]?.item.intentId === intentId)
+        waiting.splice(i, 1)
+    }
+  }
+
+  function stopPendingByOwner(ownerId: string, _reason: string) {
+    for (let i = waiting.length - 1; i >= 0; i -= 1) {
+      if (waiting[i]?.item.ownerId === ownerId)
+        waiting.splice(i, 1)
+    }
+  }
+
   function stopByIntent(intentId: string, reason: string) {
     for (const entry of active.values()) {
       if (entry.item.intentId !== intentId)
@@ -267,6 +291,9 @@ export function createPlaybackManager<TAudio>(options: PlaybackManagerOptions<TA
   return {
     schedule,
     stopAll,
+    stopPending,
+    stopPendingByIntent,
+    stopPendingByOwner,
     stopByIntent,
     stopByOwner,
     onStart,

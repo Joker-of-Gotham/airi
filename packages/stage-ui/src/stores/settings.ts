@@ -5,7 +5,7 @@ import messages from '@proj-airi/i18n/locales'
 import { useEventListener } from '@vueuse/core'
 import { converter } from 'culori'
 import { defineStore } from 'pinia'
-import { onMounted, watch } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 
 import { createResettableLocalStorage, createResettableRef } from '../utils/resettable'
 import { useAudioDevice } from './audio'
@@ -232,14 +232,45 @@ export const useSettingsAudioDevice = defineStore('settings-audio-devices', () =
     selectedAudioInputNonPersist.value = newValue
   })
 
+  // Keep stream state aligned even when enabled is already true at boot.
   watch(selectedAudioInputEnabledPersist, (val) => {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/783cccc2-5b30-488c-830d-4d552308c88b', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: 'debug-session', runId: 'run2', hypothesisId: 'E', location: 'packages/stage-ui/src/stores/settings.ts:useSettingsAudioDevice', message: 'selectedAudioInputEnabledPersist toggled', data: { enabled: val, selectedAudioInputPersist: selectedAudioInputPersist.value }, timestamp: Date.now() }) }).catch(() => {})
+    // #endregion
     if (val) {
       startStream()
     }
     else {
       stopStream()
     }
-  })
+  }, { immediate: true })
+
+  // When enabled=true but device list isn't ready yet, request permission and start stream once devices are available.
+  const requestedPermissionOnce = ref(false)
+  watch([selectedAudioInputEnabledPersist, audioInputs, selectedAudioInputPersist], ([enabled, inputs, selected]) => {
+    if (!enabled)
+      return
+
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/783cccc2-5b30-488c-830d-4d552308c88b', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: 'debug-session', runId: 'run4', hypothesisId: 'E', location: 'packages/stage-ui/src/stores/settings.ts:useSettingsAudioDevice', message: 'enabled=true reconcile tick', data: { inputs: inputs.length, selected, hasSelectedInList: !!selected && inputs.some(d => d.deviceId === selected) }, timestamp: Date.now() }) }).catch(() => {})
+    // #endregion
+
+    if (inputs.length === 0) {
+      if (!requestedPermissionOnce.value) {
+        requestedPermissionOnce.value = true
+        askPermission()
+      }
+      return
+    }
+
+    const hasSelectedInList = !!selected && inputs.some(d => d.deviceId === selected)
+    if (!hasSelectedInList) {
+      const fallback = inputs.find(d => d.deviceId === 'default')?.deviceId ?? inputs[0].deviceId
+      selectedAudioInputPersist.value = fallback
+    }
+
+    startStream()
+  }, { immediate: true })
 
   onMounted(() => {
     const hasSelectedInput = selectedAudioInputPersist.value

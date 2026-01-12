@@ -11,7 +11,7 @@ import { drizzle } from '@proj-airi/drizzle-duckdb-wasm'
 import { getImportUrlBundles } from '@proj-airi/drizzle-duckdb-wasm/bundles/import-url-browser'
 import { createLive2DLipSync } from '@proj-airi/model-driver-lipsync'
 import { wlipsyncProfile } from '@proj-airi/model-driver-lipsync/shared/wlipsync'
-import { createPlaybackManager, createSpeechPipeline } from '@proj-airi/pipelines-audio'
+import { createPlaybackManager, createSpeechPipeline, createTtsSegmentStream } from '@proj-airi/pipelines-audio'
 import { Live2DScene, useLive2d } from '@proj-airi/stage-ui-live2d'
 import { ThreeScene, useModelStore } from '@proj-airi/stage-ui-three'
 import { animations } from '@proj-airi/stage-ui-three/assets/vrm'
@@ -27,6 +27,14 @@ import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useDelayMessageQueue, useEmotionsMessageQueue } from '../../composables/queues'
 import { llmInferenceEndToken } from '../../constants'
 import { EMOTION_EmotionMotionName_value, EMOTION_VRMExpressionName_value, EmotionThinkMotionName } from '../../constants/emotions'
+import { getSpeechBusContext, speechStopAllEvent, speechStopPendingEvent } from '../../services/speech/bus'
+import {
+  getVoiceTraceBusContext,
+  voiceTraceLlmDeltaEvent,
+  voiceTraceLlmEndEvent,
+  voiceTraceLlmStartEvent,
+  voiceTraceOutputLevelEvent,
+} from '../../services/voice-trace/bus'
 import { useAudioContext, useSpeakingStore } from '../../stores/audio'
 import { useChatOrchestratorStore } from '../../stores/chat'
 import { useAiriCardStore } from '../../stores/modules'
@@ -88,6 +96,8 @@ type CaptionChannelEvent
     | { type: 'caption-assistant', text: string }
 const { post: postCaption } = useBroadcastChannel<CaptionChannelEvent, CaptionChannelEvent>({ name: 'airi-caption-overlay' })
 const assistantCaption = ref('')
+const voiceTrace = getVoiceTraceBusContext()
+const voiceTraceOriginId = 'stage-ui:Stage'
 
 type PresentEvent
   = | { type: 'assistant-reset' }
@@ -119,9 +129,12 @@ const live2dLipSyncOptions: Live2DLipSyncOptions = { mouthUpdateIntervalMs: 50, 
 
 const { activeCard } = storeToRefs(useAiriCardStore())
 const speechStore = useSpeechStore()
-const { ssmlEnabled, activeSpeechProvider, activeSpeechModel, activeSpeechVoice, pitch } = storeToRefs(speechStore)
+const { ssmlEnabled, activeSpeechProvider, activeSpeechModel, activeSpeechVoice, pitch, rate } = storeToRefs(speechStore)
 const activeCardId = computed(() => activeCard.value?.name ?? 'default')
 const speechRuntimeStore = useSpeechRuntimeStore()
+const speechBus = getSpeechBusContext()
+
+let currentChatIntent: ReturnType<typeof speechRuntimeStore.openIntent> | null = null
 
 const { currentMotion } = storeToRefs(useLive2d())
 
@@ -173,6 +186,8 @@ const playbackManager = createPlaybackManager<AudioBuffer>({
       const source = audioContext.createBufferSource()
       currentAudioSource.value = source
       source.buffer = item.audio
+      // Playback-rate based speech speed-up. Keeps it provider-agnostic.
+      source.playbackRate.value = Math.max(0.5, Math.min(2, Number(rate.value) || 1))
 
       source.connect(audioContext.destination)
       if (audioAnalyser.value)
@@ -237,7 +252,7 @@ const speechPipeline = createSpeechPipeline<AudioBuffer>({
 
     const providerConfig = providersStore.getProviderConfig(activeSpeechProvider.value)
     const input = ssmlEnabled.value
-      ? speechStore.generateSSML(request.text, activeSpeechVoice.value, { ...providerConfig, pitch: pitch.value })
+      ? speechStore.generateSSML(request.text, activeSpeechVoice.value, { ...providerConfig, pitch: pitch.value, speed: rate.value })
       : request.text
 
     const res = await generateSpeech({
@@ -252,9 +267,54 @@ const speechPipeline = createSpeechPipeline<AudioBuffer>({
     return audioContext.decodeAudioData(res)
   },
   playback: playbackManager,
+  // Tune segmentation to reduce pauses:
+  // - Smaller chunks
+  // - Split on more punctuation/emoji/** via updated chunker
+  segmenter: (tokens, meta) => {
+    return createTtsSegmentStream(tokens, meta, {
+      boost: 3,
+      minimumWords: 2,
+      maximumWords: 8,
+      // Dynamic minimum (best range suggested): [11..20]
+      minimumCharsBeforeFirst: 20,
+      minimumCharsAfterFirst: 11,
+      // Hard cap to avoid long-stall chunks
+      maximumChars: 48,
+    })
+  },
 })
 
 void speechRuntimeStore.registerHost(speechPipeline)
+
+// Barge-in / interrupt support: stop all current playback ASAP when requested by input side.
+speechBus.on(speechStopAllEvent, (evt) => {
+  const payload = (evt as any)?.body as { originId?: string, reason?: string } | undefined
+  playbackManager.stopAll(payload?.reason ?? 'stop-all')
+  assistantCaption.value = ''
+  postCaption({ type: 'caption-assistant', text: '' })
+  postPresent({ type: 'assistant-reset' })
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/783cccc2-5b30-488c-830d-4d552308c88b', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: 'debug-session', runId: 'post-fix', hypothesisId: 'F', location: 'packages/stage-ui/src/components/scenes/Stage.vue:speechStopAllEvent', message: 'speechStopAllEvent received', data: { originId: payload?.originId ?? '(unknown)', reason: payload?.reason ?? '' }, timestamp: Date.now() }) }).catch(() => {})
+  // #endregion
+})
+
+// Soft barge-in: finish the currently playing segment, but drop any queued backlog and stop future generation.
+speechBus.on(speechStopPendingEvent, (evt) => {
+  const payload = (evt as any)?.body as { originId?: string, reason?: string } | undefined
+
+  // Drop queued audio (not-yet-played)
+  playbackManager.stopPending?.(payload?.reason ?? 'stop-pending')
+
+  // Stop generating further speech for the current LLM intent WITHOUT interrupting current playback.
+  if (currentChatIntent) {
+    currentChatIntent.cancel(payload?.reason ?? 'stop-pending', { stopPlayback: false })
+    currentChatIntent = null
+  }
+
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/783cccc2-5b30-488c-830d-4d552308c88b', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: 'debug-session', runId: 'post-fix', hypothesisId: 'G', location: 'packages/stage-ui/src/components/scenes/Stage.vue:speechStopPendingEvent', message: 'speechStopPendingEvent received', data: { originId: payload?.originId ?? '(unknown)', reason: payload?.reason ?? '' }, timestamp: Date.now() }) }).catch(() => {})
+  // #endregion
+})
 
 speechPipeline.on('onSpecial', (segment) => {
   if (segment.special)
@@ -286,6 +346,7 @@ function startLipSyncLoop() {
   if (lipSyncLoopId.value)
     return
 
+  let emitCounter = 0
   const tick = () => {
     if (!nowSpeaking.value || !live2dLipSync.value) {
       mouthOpenSize.value = 0
@@ -293,6 +354,18 @@ function startLipSyncLoop() {
     else {
       mouthOpenSize.value = live2dLipSync.value.getMouthOpen()
     }
+
+    // Emit a lightweight output level signal for the devtools overlay.
+    // Keep it low-frequency (~20Hz) to avoid spamming BroadcastChannel.
+    emitCounter = (emitCounter + 1) % 3
+    if (emitCounter === 0) {
+      voiceTrace.emit(voiceTraceOutputLevelEvent, {
+        originId: voiceTraceOriginId,
+        at: Date.now(),
+        level: Number.isFinite(mouthOpenSize.value) ? Math.max(0, Math.min(1, mouthOpenSize.value)) : 0,
+      })
+    }
+
     lipSyncLoopId.value = requestAnimationFrame(tick)
   }
 
@@ -323,10 +396,9 @@ function setupAnalyser() {
   }
 }
 
-let currentChatIntent: ReturnType<typeof speechRuntimeStore.openIntent> | null = null
-
 chatHookCleanups.push(onBeforeMessageComposed(async () => {
-  playbackManager.stopAll('new-message')
+  // Soft stop previous backlog: let current segment finish, drop queued audio, and start new generation immediately.
+  playbackManager.stopPending?.('new-message')
 
   setupAnalyser()
   await setupLipSync()
@@ -336,7 +408,7 @@ chatHookCleanups.push(onBeforeMessageComposed(async () => {
   postPresent({ type: 'assistant-reset' })
 
   if (currentChatIntent) {
-    currentChatIntent.cancel('new-message')
+    currentChatIntent.cancel('new-message', { stopPlayback: false })
     currentChatIntent = null
   }
 
@@ -344,6 +416,14 @@ chatHookCleanups.push(onBeforeMessageComposed(async () => {
     ownerId: activeCardId.value,
     priority: 'normal',
     behavior: 'queue',
+  })
+
+  voiceTrace.emit(voiceTraceLlmStartEvent, {
+    originId: voiceTraceOriginId,
+    at: Date.now(),
+    meta: {
+      source: 'unknown',
+    },
   })
 }))
 
@@ -353,6 +433,13 @@ chatHookCleanups.push(onBeforeSend(async () => {
 
 chatHookCleanups.push(onTokenLiteral(async (literal) => {
   currentChatIntent?.writeLiteral(literal)
+  if (literal) {
+    voiceTrace.emit(voiceTraceLlmDeltaEvent, {
+      originId: voiceTraceOriginId,
+      at: Date.now(),
+      delta: literal,
+    })
+  }
 }))
 
 chatHookCleanups.push(onTokenSpecial(async (special) => {
@@ -367,6 +454,10 @@ chatHookCleanups.push(onStreamEnd(async () => {
 chatHookCleanups.push(onAssistantResponseEnd(async (_message) => {
   currentChatIntent?.end()
   currentChatIntent = null
+  voiceTrace.emit(voiceTraceLlmEndEvent, {
+    originId: voiceTraceOriginId,
+    at: Date.now(),
+  })
   // const res = await embed({
   //   ...transformersProvider.embed('Xenova/nomic-embed-text-v1'),
   //   input: message,

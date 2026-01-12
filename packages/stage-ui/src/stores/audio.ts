@@ -79,7 +79,19 @@ export function useAudioDevice(requestPermission: boolean = false) {
   const audioInputs = computed(() => devices.audioInputs.value)
   const selectedAudioInput = ref<string>(devices.audioInputs.value.find(device => device.deviceId === 'default')?.deviceId || '')
   const deviceConstraints = computed<MediaStreamConstraints>(() => ({ audio: { deviceId: { exact: selectedAudioInput.value }, autoGainControl: true, echoCancellation: true, noiseSuppression: true } }))
+  // NOTE: Some @vueuse/core versions don't expose `error` in the return type of useUserMedia.
+  // Keep code compatible with the monorepo's pinned version.
   const { stream, stop: stopStream, start: startStream } = useUserMedia({ constraints: deviceConstraints, enabled: false, autoSwitch: true })
+
+  // #region agent log
+  watch([selectedAudioInput, () => String((deviceConstraints.value as any)?.audio?.deviceId?.exact ?? '')], ([id, exact]) => {
+    fetch('http://127.0.0.1:7242/ingest/783cccc2-5b30-488c-830d-4d552308c88b', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: 'debug-session', runId: 'run2', hypothesisId: 'E', location: 'packages/stage-ui/src/stores/audio.ts:useAudioDevice', message: 'audio device selection/constraints', data: { selectedAudioInput: id, exact }, timestamp: Date.now() }) }).catch(() => {})
+  }, { immediate: true })
+
+  watch(stream, (s) => {
+    fetch('http://127.0.0.1:7242/ingest/783cccc2-5b30-488c-830d-4d552308c88b', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: 'debug-session', runId: 'run2', hypothesisId: 'E', location: 'packages/stage-ui/src/stores/audio.ts:useAudioDevice', message: 'useUserMedia stream changed', data: { hasStream: !!s, tracks: s?.getTracks?.()?.length ?? 0 }, timestamp: Date.now() }) }).catch(() => {})
+  }, { immediate: true })
+  // #endregion
 
   watch(audioInputs, () => {
     if (!selectedAudioInput.value && audioInputs.value.length > 0) {

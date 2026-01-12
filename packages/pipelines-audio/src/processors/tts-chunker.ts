@@ -23,6 +23,21 @@ export interface TtsInputChunkOptions {
   boost?: number
   minimumWords?: number
   maximumWords?: number
+  /**
+   * When provided, chunking will also respect grapheme/char length bounds.
+   * This helps reduce pauses for long sentences and for CJK languages where "word" counts are not stable.
+   */
+  minimumChars?: number
+  maximumChars?: number
+  /**
+   * Dynamic minimum length control:
+   * - before we have emitted any speech chunks, keep segments longer to reduce "overly short" audio.
+   * - after at least one chunk is emitted, allow shorter segments to improve responsiveness.
+   *
+   * Recommended range: [11..20]
+   */
+  minimumCharsBeforeFirst?: number
+  minimumCharsAfterFirst?: number
 }
 
 export interface TtsChunkItem {
@@ -39,6 +54,10 @@ export async function* chunkTtsInput(
     boost = 2,
     minimumWords = 4,
     maximumWords = 12,
+    minimumChars = 12,
+    maximumChars = 64,
+    minimumCharsBeforeFirst = 20,
+    minimumCharsAfterFirst = 11,
   } = options ?? {}
 
   const iterator = readGraphemeClusters(
@@ -65,19 +84,31 @@ export async function* chunkTtsInput(
   while (!current.done) {
     let value = current.value
 
-    if (value.length > 1) {
-      previousValue = value
-      current = await iterator.next()
-      continue
-    }
+    // Some grapheme clusters (e.g. emoji) may have length > 1.
+    // We must NOT skip them, otherwise TTS input loses content and can't split on emoji boundaries.
 
     const flush = value === TTS_FLUSH_INSTRUCTION
     const special = value === TTS_SPECIAL_TOKEN
-    const hard = hardPunctuations.has(value)
+    const isEmoji = /\p{Extended_Pictographic}/u.test(value)
+    const hard = isEmoji || hardPunctuations.has(value)
     const soft = softPunctuations.has(value)
     const kept = keptPunctuations.has(value)
     let next: IteratorResult<string, any> | undefined
     let afterNext: IteratorResult<string, any> | undefined
+
+    // Markdown strong marker: split on paired "**" (and do not speak the marker)
+    if (value === '*') {
+      next = await iterator.next()
+      if (!next.done && next.value === '*') {
+        // Treat "**" as a flush boundary without emitting any visible chars.
+        value = TTS_FLUSH_INSTRUCTION
+      }
+      else {
+        // Not a pair, keep as literal
+        afterNext = next
+        next = undefined
+      }
+    }
 
     if (flush || special || hard || soft) {
       switch (value) {
@@ -118,7 +149,14 @@ export async function* chunkTtsInput(
         }
 
         previousValue = value
-        current = await iterator.next()
+        if (afterNext !== undefined) {
+          current = afterNext
+          afterNext = undefined
+        }
+        else {
+          current = next ?? await iterator.next()
+          next = undefined
+        }
         continue
       }
 
@@ -140,6 +178,9 @@ export async function* chunkTtsInput(
       chunkWordsCount += words.length
       buffer = ''
 
+      const dynamicMinChars = yieldCount > 0 ? minimumCharsAfterFirst : minimumCharsBeforeFirst
+      const dynamicMinLen = Math.max(minimumChars, dynamicMinChars)
+
       if (special) {
         const text = chunk.slice(0, -1).trim()
         yield {
@@ -151,12 +192,29 @@ export async function* chunkTtsInput(
         chunk = ''
         chunkWordsCount = 0
       }
-      else if (flush || hard || chunkWordsCount > maximumWords || yieldCount < boost) {
+      else if (flush || hard || chunkWordsCount > maximumWords || chunk.length > maximumChars || yieldCount < boost) {
+        // (1) Short segment extension:
+        // If the segment between punctuations is too short, DO NOT emit yet; extend to next punctuation.
+        // (2) Dynamic minimum:
+        // Before any audio emitted, require longer segments; after that allow shorter ones.
+        const shouldExtendShort
+          = !flush
+            && !hard
+            && (chunk.length < dynamicMinLen || chunkWordsCount < Math.min(minimumWords, 3))
+            && yieldCount >= boost
+            && chunk.length < maximumChars
+
+        if (shouldExtendShort) {
+          previousValue = value
+          current = next ?? await iterator.next()
+          next = undefined
+          continue
+        }
         const text = chunk.trim()
         yield {
           text,
           words: chunkWordsCount,
-          reason: flush ? 'flush' : hard ? 'hard' : chunkWordsCount > maximumWords ? 'limit' : 'boost',
+          reason: flush ? 'flush' : hard ? 'hard' : (chunkWordsCount > maximumWords || chunk.length > maximumChars) ? 'limit' : 'boost',
         }
         yieldCount++
         chunk = ''
@@ -187,9 +245,6 @@ export async function* chunkTtsInput(
     current = next
   }
 
-  // TODO: remove later
-  // eslint-disable-next-line no-console
-  console.debug('while loop ends, chunk/buffer:', chunk, buffer)
   if (chunk.length > 0 || buffer.length > 0) {
     const text = (chunk + buffer).trim()
     yield {

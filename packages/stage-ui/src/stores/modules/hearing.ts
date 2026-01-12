@@ -12,6 +12,7 @@ import vadWorkletUrl from '../../workers/vad/process.worklet?worker&url'
 import { createResettableLocalStorage, createResettableRef } from '../../utils/resettable'
 import { useProvidersStore } from '../providers'
 import { streamAliyunTranscription } from '../providers/aliyun/stream-transcription'
+import { useSettings } from '../settings'
 
 export interface StreamTranscriptionFileInputOptions extends Omit<XSAIStreamTranscriptionOptions, 'file' | 'fileName'> {
   file: Blob
@@ -121,6 +122,9 @@ export const useHearingStore = defineStore('hearing-store', () => {
     format?: TranscriptionResponseFormat,
     options?: HearingTranscriptionInvokeOptions,
   ): Promise<HearingTranscriptionResult> {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/783cccc2-5b30-488c-830d-4d552308c88b', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: 'debug-session', runId: 'pre-fix', hypothesisId: 'B', location: 'packages/stage-ui/src/stores/modules/hearing.ts:useHearingStore.transcription', message: 'enter transcription()', data: { providerId, model, format: format ?? 'default', hasFile: input instanceof File || !!(input as any)?.file, hasStream: !!(input as any)?.inputAudioStream }, timestamp: Date.now() }) }).catch(() => {})
+    // #endregion
     const normalizedInput = (input instanceof File ? { file: input } : input ?? {}) as {
       file?: File
       inputAudioStream?: ReadableStream<ArrayBuffer>
@@ -246,12 +250,41 @@ export const useHearingStore = defineStore('hearing-store', () => {
       }
     }
 
-    const response = await generateTranscription({
-      ...(provider.transcription(model, options?.providerOptions) as any),
-      file: normalizedInput.file,
-      language: options?.language,
-      responseFormat: resolvedFormat === 'verbose_json' ? 'verbose_json' : 'json',
-    } as any)
+    const req = provider.transcription(model, options?.providerOptions) as any
+    const base = typeof req?.baseURL === 'string'
+      ? req.baseURL
+      : req?.baseURL instanceof URL
+        ? req.baseURL.toString()
+        : ''
+    const normalizeBaseUrlForLog = (input: string) => {
+      try {
+        const u = new URL(input)
+        return `${u.protocol}//${u.host}${u.pathname}`
+      }
+      catch {
+        return input
+      }
+    }
+    const baseUrlForLog = base ? normalizeBaseUrlForLog(base) : '(unknown)'
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/783cccc2-5b30-488c-830d-4d552308c88b', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: 'debug-session', runId: 'pre-fix', hypothesisId: 'B', location: 'packages/stage-ui/src/stores/modules/hearing.ts:useHearingStore.transcription', message: 'about to call generateTranscription', data: { providerId, model, responseFormat: resolvedFormat, baseURL: baseUrlForLog }, timestamp: Date.now() }) }).catch(() => {})
+    // #endregion
+
+    let response: any
+    try {
+      response = await generateTranscription({
+        ...req,
+        file: normalizedInput.file,
+        language: options?.language,
+        responseFormat: resolvedFormat === 'verbose_json' ? 'verbose_json' : 'json',
+      } as any)
+    }
+    catch (e) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/783cccc2-5b30-488c-830d-4d552308c88b', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: 'debug-session', runId: 'pre-fix', hypothesisId: 'B', location: 'packages/stage-ui/src/stores/modules/hearing.ts:useHearingStore.transcription', message: 'generateTranscription threw', data: { providerId, model, error: String((e as any)?.message ?? e) }, timestamp: Date.now() }) }).catch(() => {})
+      // #endregion
+      throw e
+    }
 
     return {
       mode: 'generate',
@@ -286,6 +319,20 @@ export const useHearingSpeechInputPipeline = defineStore('modules:hearing:speech
   const hearingStore = useHearingStore()
   const { activeTranscriptionProvider, activeTranscriptionModel } = storeToRefs(hearingStore)
   const providersStore = useProvidersStore()
+  const settingsStore = useSettings()
+  const { language: uiLanguage } = storeToRefs(settingsStore)
+
+  const languageHint = computed(() => {
+    const lang = (uiLanguage.value || navigator.language || '').toLowerCase()
+    if (lang.startsWith('zh'))
+      return 'zh'
+    if (lang.startsWith('ja'))
+      return 'ja'
+    if (lang.startsWith('ko'))
+      return 'ko'
+    // Let provider decide for other languages / auto-detect.
+    return undefined
+  })
   const streamingSession = shallowRef<{
     audioContext: AudioContext
     workletNode: AudioWorkletNode
@@ -426,6 +473,9 @@ export const useHearingSpeechInputPipeline = defineStore('modules:hearing:speech
 
     try {
       const providerId = activeTranscriptionProvider.value
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/783cccc2-5b30-488c-830d-4d552308c88b', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: 'debug-session', runId: 'pre-fix', hypothesisId: 'B', location: 'packages/stage-ui/src/stores/modules/hearing.ts:transcribeForMediaStream', message: 'enter transcribeForMediaStream', data: { providerId, model: activeTranscriptionModel.value, supportsStreamInput: supportsStreamInput.value, hasExistingSession: !!streamingSession.value }, timestamp: Date.now() }) }).catch(() => {})
+      // #endregion
       const provider = await providersStore.getProviderInstance<TranscriptionProviderWithExtraOptions<string, any>>(providerId)
       if (!provider) {
         throw new Error('Failed to initialize speech provider')
@@ -478,6 +528,7 @@ export const useHearingSpeechInputPipeline = defineStore('modules:hearing:speech
             abortSignal: abortController.signal,
             ...options?.providerOptions,
           },
+          language: languageHint.value,
         },
       )
 
@@ -496,6 +547,7 @@ export const useHearingSpeechInputPipeline = defineStore('modules:hearing:speech
       if (result.mode === 'stream' && result.textStream) {
         void (async () => {
           let fullText = ''
+          let loggedFirst = false
           try {
             const reader = result.textStream.getReader()
 
@@ -505,6 +557,12 @@ export const useHearingSpeechInputPipeline = defineStore('modules:hearing:speech
                 break
               if (value) {
                 fullText += value
+                if (!loggedFirst) {
+                  loggedFirst = true
+                  // #region agent log
+                  fetch('http://127.0.0.1:7242/ingest/783cccc2-5b30-488c-830d-4d552308c88b', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: 'debug-session', runId: 'pre-fix', hypothesisId: 'B', location: 'packages/stage-ui/src/stores/modules/hearing.ts:transcribeForMediaStream', message: 'first text delta received', data: { providerId, deltaLen: value.length }, timestamp: Date.now() }) }).catch(() => {})
+                  // #endregion
+                }
                 options?.onSentenceEnd?.(value)
               }
             }
@@ -513,6 +571,9 @@ export const useHearingSpeechInputPipeline = defineStore('modules:hearing:speech
             console.error('Error reading text stream:', err)
           }
           finally {
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/783cccc2-5b30-488c-830d-4d552308c88b', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: 'debug-session', runId: 'pre-fix', hypothesisId: 'B', location: 'packages/stage-ui/src/stores/modules/hearing.ts:transcribeForMediaStream', message: 'stream ended', data: { providerId, fullLen: fullText.length }, timestamp: Date.now() }) }).catch(() => {})
+            // #endregion
             options?.onSpeechEnd?.(fullText)
           }
         })()
@@ -531,6 +592,9 @@ export const useHearingSpeechInputPipeline = defineStore('modules:hearing:speech
     try {
       if (recording && recording.size > 0) {
         const providerId = activeTranscriptionProvider.value
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/783cccc2-5b30-488c-830d-4d552308c88b', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: 'debug-session', runId: 'pre-fix', hypothesisId: 'B', location: 'packages/stage-ui/src/stores/modules/hearing.ts:transcribeForRecording', message: 'enter transcribeForRecording', data: { providerId, model: activeTranscriptionModel.value, blobSize: recording.size }, timestamp: Date.now() }) }).catch(() => {})
+        // #endregion
         const provider = await providersStore.getProviderInstance<TranscriptionProviderWithExtraOptions<string, any>>(providerId)
         if (!provider) {
           throw new Error('Failed to initialize speech provider')
@@ -543,12 +607,23 @@ export const useHearingSpeechInputPipeline = defineStore('modules:hearing:speech
           provider,
           model,
           new File([recording], 'recording.wav'),
+          undefined,
+          {
+            providerOptions: providersStore.getProviderConfig(providerId),
+            language: languageHint.value,
+          },
         )
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/783cccc2-5b30-488c-830d-4d552308c88b', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: 'debug-session', runId: 'pre-fix', hypothesisId: 'B', location: 'packages/stage-ui/src/stores/modules/hearing.ts:transcribeForRecording', message: 'transcription result received', data: { providerId, mode: result.mode, textLen: (result as any)?.text ? String((result as any).text).length : 0 }, timestamp: Date.now() }) }).catch(() => {})
+        // #endregion
         return result.mode === 'stream' ? await result.text : result.text
       }
     }
     catch (err) {
       error.value = err instanceof Error ? err.message : String(err)
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/783cccc2-5b30-488c-830d-4d552308c88b', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: 'debug-session', runId: 'pre-fix', hypothesisId: 'B', location: 'packages/stage-ui/src/stores/modules/hearing.ts:transcribeForRecording', message: 'transcribeForRecording failed', data: { error: error.value }, timestamp: Date.now() }) }).catch(() => {})
+      // #endregion
       console.error('Error generating transcription:', error.value)
     }
   }
