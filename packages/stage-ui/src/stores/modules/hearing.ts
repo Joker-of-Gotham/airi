@@ -372,7 +372,7 @@ export const useHearingSpeechInputPipeline = defineStore('modules:hearing:speech
   }>()
 
   const supportsStreamInput = computed(() => {
-    const providerId = activeTranscriptionProvider.value
+      const providerId = activeTranscriptionProvider.value
     if (!providerId)
       return false
 
@@ -560,7 +560,7 @@ export const useHearingSpeechInputPipeline = defineStore('modules:hearing:speech
     }
 
     try {
-      const providerId = activeTranscriptionProvider.value
+    const providerId = activeTranscriptionProvider.value
       if (!providerId) {
         error.value = 'No transcription provider selected'
         console.error('[Hearing Pipeline] No transcription provider selected')
