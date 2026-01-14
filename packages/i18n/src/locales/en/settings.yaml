@@ -747,6 +747,13 @@ pages:
               verbose_json: verbose_json
               text: text
     title: Providers
+  connection:
+    description: Configure WebSocket server connection
+    title: Connection
+    websocket-url:
+      description: Full address of the WebSocket server (e.g., ws://localhost:6121/ws)
+      label: WebSocket Server Address
+      placeholder: ws://localhost:6121/ws
   scene:
     description: Configure the environment where the character lives
     title: Scene
