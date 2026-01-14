@@ -23,6 +23,108 @@ const routeMeta = computed(() => route.meta as {
   subtitle?: string
 })
 
+const routeHeaderMetadataMap = computed(() => {
+  const map: Record<string, { subtitle?: string, title: string }> = {
+    '/settings/airi-card': {
+      subtitle: t('settings.title'),
+      title: t('settings.pages.card.title'),
+    },
+    '/settings/system': {
+      subtitle: t('settings.title'),
+      title: t('settings.pages.system.title'),
+    },
+    '/settings/system/general': {
+      subtitle: t('settings.title'),
+      title: t('settings.pages.system.general.title'),
+    },
+    '/settings/system/color-scheme': {
+      subtitle: t('settings.title'),
+      title: t('settings.pages.system.color-scheme.title'),
+    },
+    '/settings/system/window-shortcuts': {
+      subtitle: t('settings.title'),
+      title: t('tamagotchi.settings.pages.system.window-shortcuts.title'),
+    },
+    '/settings/system/developer': {
+      subtitle: t('settings.title'),
+      title: t('settings.pages.system.developer.title'),
+    },
+    '/settings/memory': {
+      subtitle: t('settings.title'),
+      title: t('settings.pages.memory.title'),
+    },
+    '/settings/models': {
+      subtitle: t('settings.title'),
+      title: t('settings.pages.models.title'),
+    },
+    '/settings/modules': {
+      subtitle: t('settings.title'),
+      title: t('settings.pages.modules.title'),
+    },
+    '/settings/modules/consciousness': {
+      subtitle: t('settings.title'),
+      title: t('settings.pages.modules.consciousness.title'),
+    },
+    '/settings/modules/speech': {
+      subtitle: t('settings.title'),
+      title: t('settings.pages.modules.speech.title'),
+    },
+    '/settings/modules/hearing': {
+      subtitle: t('settings.title'),
+      title: t('settings.pages.modules.hearing.title'),
+    },
+    '/settings/modules/memory-short-term': {
+      subtitle: t('settings.title'),
+      title: t('settings.pages.modules.memory-short-term.title'),
+    },
+    '/settings/modules/memory-long-term': {
+      subtitle: t('settings.title'),
+      title: t('settings.pages.modules.memory-long-term.title'),
+    },
+    '/settings/modules/messaging-discord': {
+      subtitle: t('settings.title'),
+      title: t('settings.pages.modules.messaging-discord.title'),
+    },
+    '/settings/modules/x': {
+      subtitle: t('settings.title'),
+      title: t('settings.pages.modules.x.title'),
+    },
+    '/settings/modules/gaming-minecraft': {
+      subtitle: t('settings.title'),
+      title: t('settings.pages.modules.gaming-minecraft.title'),
+    },
+    '/settings/modules/gaming-factorio': {
+      subtitle: t('settings.title'),
+      title: t('settings.pages.modules.gaming-factorio.title'),
+    },
+    '/settings/modules/beat-sync': {
+      subtitle: t('settings.title'),
+      title: t('settings.pages.modules.beat_sync.title'),
+    },
+    '/settings/providers': {
+      subtitle: t('settings.title'),
+      title: t('settings.pages.providers.title'),
+    },
+    '/settings/data': {
+      subtitle: t('settings.title'),
+      title: t('settings.pages.data.title'),
+    },
+    '/settings/connection': {
+      subtitle: t('settings.title'),
+      title: t('settings.pages.connection.title'),
+    },
+    '/settings/scene': {
+      subtitle: t('settings.title'),
+      title: t('settings.pages.scene.title'),
+    },
+    '/settings': {
+      title: t('settings.title'),
+    },
+  }
+
+  return map
+})
+
 const providerTitle = computed(() => {
   if (!route.path.startsWith('/settings/providers/'))
     return undefined
@@ -61,6 +163,10 @@ const routeHeaderMetadata = computed(() => {
       subtitle: t('settings.title'),
     }
   }
+
+  const mapEntry = routeHeaderMetadataMap.value[route.path]
+  if (mapEntry)
+    return mapEntry
 
   return undefined
 })

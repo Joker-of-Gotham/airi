@@ -700,11 +700,11 @@ pages:
           title: Playground de Transcripción
     title: Proveedores
   connection:
-    description: Configure WebSocket server connection
-    title: Connection
+    description: Configurar la conexión del servidor WebSocket
+    title: Conexión
     websocket-url:
-      description: Full address of the WebSocket server (e.g., ws://localhost:6121/ws)
-      label: WebSocket Server Address
+      description: 'Dirección completa del servidor WebSocket (ej.: ws://localhost:6121/ws)'
+      label: Dirección del servidor WebSocket
       placeholder: ws://localhost:6121/ws
   scene:
     description: Configurar el entorno donde vive el personaje
