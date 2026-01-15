@@ -435,7 +435,7 @@ pages:
                 api-key:
                   label: APIキー
                   description: このプロバイダへのリクエストを承認するために使用されるAPIキー
-                  placeholder: sk-…
+                  placeholder: sk-...
                 base-url:
                   label: ベースURL
                   description: >-
@@ -700,11 +700,11 @@ pages:
           title: 文字起こし実験場
     title: プロバイダー
   connection:
-    description: WebSocket サーバー接続を設定
-    title: 接続
+    description: Configure WebSocket server connection
+    title: Connection
     websocket-url:
-      description: WebSocket サーバーの完全なアドレス（例：ws://localhost:6121/ws）
-      label: WebSocket サーバーアドレス
+      description: Full address of the WebSocket server (e.g., ws://localhost:6121/ws)
+      label: WebSocket Server Address
       placeholder: ws://localhost:6121/ws
   scene:
     description: キャラクターが過ごす環境を設定する
