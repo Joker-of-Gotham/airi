@@ -11,7 +11,7 @@ import { useSettingsAudioDevice } from '@proj-airi/stage-ui/stores/settings'
 import { Button, FieldCheckbox, FieldInput, FieldRange, FieldSelect } from '@proj-airi/ui'
 import { until } from '@vueuse/core'
 import { storeToRefs } from 'pinia'
-import { computed, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 const { t } = useI18n()
@@ -493,6 +493,7 @@ watch(activeTranscriptionProvider, async (provider) => {
     return
 
   await hearingStore.loadModelsForProvider(provider)
+  syncOpenAICompatibleSettings()
 
   // Auto-select first model for Web Speech API if no model is selected
   if (provider === 'browser-web-speech-api' && !activeTranscriptionModel.value) {
@@ -503,6 +504,11 @@ watch(activeTranscriptionProvider, async (provider) => {
     }
   }
 }, { immediate: true })
+
+onMounted(async () => {
+  // Audio devices are loaded on demand when user requests them
+  syncOpenAICompatibleSettings()
+})
 
 onUnmounted(() => {
   stopSTTTest()

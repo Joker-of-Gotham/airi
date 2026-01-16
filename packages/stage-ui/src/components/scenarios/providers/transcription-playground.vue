@@ -141,12 +141,9 @@ onStopRecord(async (recording) => {
 // Monitoring toggle
 async function toggleMonitoring() {
   if (!isMonitoring.value) {
-    // Clear previous recordings and transcriptions when starting a new monitoring session
-    // Clean up previous audio URLs
-    audioCleanups.value.forEach(cleanup => cleanup())
-    audioCleanups.value = []
-    audios.value = []
-    transcriptions.value = []
+    // Clear previous recording and transcription when starting a new monitoring session
+    audioBlob.value = undefined
+    transcriptionText.value = ''
     // Clear any previous error messages
     errorMessage.value = ''
 
