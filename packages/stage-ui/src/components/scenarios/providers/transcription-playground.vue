@@ -115,6 +115,8 @@ onStopRecord(async (recording) => {
   try {
     if (recording && recording.size > 0) {
       audioBlob.value = recording
+      // Clear any previous error message
+      errorMessage.value = ''
       const result = await props.generateTranscription(
         new File([recording], 'recording.wav'),
         {
@@ -126,6 +128,8 @@ onStopRecord(async (recording) => {
         ? await result.text
         : result.text
       transcriptionText.value = text
+      // Clear error message on success
+      errorMessage.value = ''
     }
   }
   catch (err) {
@@ -137,6 +141,15 @@ onStopRecord(async (recording) => {
 // Monitoring toggle
 async function toggleMonitoring() {
   if (!isMonitoring.value) {
+    // Clear previous recordings and transcriptions when starting a new monitoring session
+    // Clean up previous audio URLs
+    audioCleanups.value.forEach(cleanup => cleanup())
+    audioCleanups.value = []
+    audios.value = []
+    transcriptions.value = []
+    // Clear any previous error messages
+    errorMessage.value = ''
+
     await setupAudioMonitoring()
     await startRecord()
     isMonitoring.value = true
@@ -223,6 +236,14 @@ onUnmounted(() => {
     <Button class="my-4" w-full @click="toggleMonitoring">
       {{ isMonitoring ? 'Stop Monitoring' : 'Start Monitoring' }}
     </Button>
+
+    <!-- Error message display -->
+    <div v-if="errorMessage" class="mb-4 border border-red-200 rounded-lg bg-red-50 p-3 dark:border-red-800 dark:bg-red-900/20">
+      <div class="flex items-center gap-2 text-red-700 dark:text-red-400">
+        <div i-solar:warning-circle-line-duotone class="text-lg" />
+        <span class="text-sm font-medium">{{ errorMessage }}</span>
+      </div>
+    </div>
 
     <div>
       <audio v-if="audioUrl" :src="audioUrl" controls class="mb-2 w-full" />
