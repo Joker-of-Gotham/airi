@@ -32,11 +32,11 @@ describe('tools mcp schema', () => {
     const schema = callTool!.function.parameters as JsonSchema
     expect(schema.properties).toBeDefined()
 
-    const parameters = (schema.properties as any).parameters
+    const parameters = (schema.properties as Record<string, JsonSchema>).parameters
     expect(parameters).toBeDefined()
 
-    const items = (parameters as any).items
+    const items = (parameters as JsonSchema).items as JsonSchema
     expect(items).toBeDefined()
-    expect(items?.additionalProperties).toBe(false)
+    expect(items.additionalProperties).toBe(false)
   })
 })

@@ -176,68 +176,71 @@ function playSpecialToken(special: string) {
 const lipSyncNode = ref<AudioNode>()
 
 async function playFunction(item: Parameters<Parameters<typeof createPlaybackManager<AudioBuffer>>[0]['play']>[0], signal: AbortSignal): Promise<void> {
-  return new Promise<void>(async (resolve) => {
-    if (!audioContext) {
+  if (!audioContext || !item.audio)
+    return
+
+  return new Promise<void>((resolve) => {
+    let settled = false
+    const resolveOnce = () => {
+      if (settled)
+        return
+      settled = true
       resolve()
-      return
     }
 
-    if (!item.audio) {
-      resolve()
-      return
-    }
-
-    // Ensure audio context is resumed (browsers suspend it by default until user interaction)
-    if (audioContext.state === 'suspended') {
-      try {
-        await audioContext.resume()
+    void (async () => {
+      // Ensure audio context is resumed (browsers suspend it by default until user interaction)
+      if (audioContext.state === 'suspended') {
+        try {
+          await audioContext.resume()
+        }
+        catch {
+          resolveOnce()
+          return
+        }
       }
-      catch {
-        resolve()
+
+      const source = audioContext.createBufferSource()
+      currentAudioSource.value = source
+      source.buffer = item.audio
+      // Playback-rate based speech speed-up. Keeps it provider-agnostic.
+      source.playbackRate.value = Math.max(0.5, Math.min(2, Number(rate.value) || 1))
+
+      source.connect(audioContext.destination)
+      if (audioAnalyser.value)
+        source.connect(audioAnalyser.value)
+      if (lipSyncNode.value)
+        source.connect(lipSyncNode.value)
+
+      const stopPlayback = () => {
+        try {
+          source.stop()
+          source.disconnect()
+        }
+        catch {}
+        if (currentAudioSource.value === source)
+          currentAudioSource.value = undefined
+        resolveOnce()
+      }
+
+      if (signal.aborted) {
+        stopPlayback()
         return
       }
-    }
 
-    const source = audioContext.createBufferSource()
-    currentAudioSource.value = source
-    source.buffer = item.audio
-    // Playback-rate based speech speed-up. Keeps it provider-agnostic.
-    source.playbackRate.value = Math.max(0.5, Math.min(2, Number(rate.value) || 1))
-
-    source.connect(audioContext.destination)
-    if (audioAnalyser.value)
-      source.connect(audioAnalyser.value)
-    if (lipSyncNode.value)
-      source.connect(lipSyncNode.value)
-
-    const stopPlayback = () => {
-      try {
-        source.stop()
-        source.disconnect()
+      signal.addEventListener('abort', stopPlayback, { once: true })
+      source.onended = () => {
+        signal.removeEventListener('abort', stopPlayback)
+        stopPlayback()
       }
-      catch {}
-      if (currentAudioSource.value === source)
-        currentAudioSource.value = undefined
-      resolve()
-    }
 
-    if (signal.aborted) {
-      stopPlayback()
-      return
-    }
-
-    signal.addEventListener('abort', stopPlayback, { once: true })
-    source.onended = () => {
-      signal.removeEventListener('abort', stopPlayback)
-      stopPlayback()
-    }
-
-    try {
-      source.start(0)
-    }
-    catch {
-      stopPlayback()
-    }
+      try {
+        source.start(0)
+      }
+      catch {
+        stopPlayback()
+      }
+    })()
   })
 }
 
