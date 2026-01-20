@@ -178,7 +178,6 @@ const lipSyncNode = ref<AudioNode>()
 async function playFunction(item: Parameters<Parameters<typeof createPlaybackManager<AudioBuffer>>[0]['play']>[0], signal: AbortSignal): Promise<void> {
   if (!audioContext || !item.audio)
     return
-
   return new Promise<void>((resolve) => {
     let settled = false
     const resolveOnce = () => {
@@ -187,7 +186,6 @@ async function playFunction(item: Parameters<Parameters<typeof createPlaybackMan
       settled = true
       resolve()
     }
-
     void (async () => {
       // Ensure audio context is resumed (browsers suspend it by default until user interaction)
       if (audioContext.state === 'suspended') {
