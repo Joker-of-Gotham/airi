@@ -13,7 +13,6 @@ import { useBackgroundThemeColor } from '@proj-airi/stage-layouts/composables/th
 import { useBackgroundStore } from '@proj-airi/stage-layouts/stores/background'
 import { WidgetStage } from '@proj-airi/stage-ui/components/scenes'
 import { useAudioRecorder } from '@proj-airi/stage-ui/composables/audio/audio-recorder'
-import { fetchSession } from '@proj-airi/stage-ui/libs/auth'
 import { getVoiceTraceBusContext, voiceTraceLlmStartEvent } from '@proj-airi/stage-ui/services/voice-trace/bus'
 import { useVAD } from '@proj-airi/stage-ui/stores/ai/models/vad'
 import { useChatOrchestratorStore } from '@proj-airi/stage-ui/stores/chat'
@@ -198,12 +197,6 @@ watch([stream, () => vadLoaded.value], async ([s, loaded]) => {
       console.error('Failed to start VAD with stream:', e)
     }
   }
-})
-
-onMounted(() => {
-  // TODO: move this to pinia store with `initialize(...)` action.
-  // Fetch session, ignore errors
-  fetchSession().catch(() => {})
 })
 </script>
 
