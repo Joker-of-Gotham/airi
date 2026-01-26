@@ -7,14 +7,13 @@ import { useLocalStorageManualReset } from '@proj-airi/stage-shared/composables'
 import { refManualReset } from '@vueuse/core'
 import { generateTranscription } from '@xsai/generate-transcription'
 import { defineStore, storeToRefs } from 'pinia'
-import { computed, ref, shallowRef, watch } from 'vue'
+import { computed, ref, shallowRef } from 'vue'
 
 import vadWorkletUrl from '../../workers/vad/process.worklet?worker&url'
 
 import { useProvidersStore } from '../providers'
 import { streamAliyunTranscription } from '../providers/aliyun/stream-transcription'
 import { streamWebSpeechAPITranscription } from '../providers/web-speech-api'
-import { useSettings } from '../settings'
 
 export interface StreamTranscriptionFileInputOptions extends Omit<XSAIStreamTranscriptionOptions, 'file' | 'fileName'> {
   file: Blob
@@ -28,8 +27,7 @@ export interface StreamTranscriptionStreamInputOptions extends Omit<XSAIStreamTr
 export type StreamTranscription = (options: WithUnknown<StreamTranscriptionFileInputOptions | StreamTranscriptionStreamInputOptions>) => StreamTranscriptionResult
 
 type GenerateTranscriptionResponse = Awaited<ReturnType<typeof generateTranscription>>
-type TranscriptionResponseFormat = 'json' | 'verbose_json' | 'text'
-type HearingTranscriptionGenerateResult = (GenerateTranscriptionResponse & { mode: 'generate', responseFormat: Exclude<TranscriptionResponseFormat, 'text'> }) | { mode: 'generate', responseFormat: 'text', text: string }
+type HearingTranscriptionGenerateResult = GenerateTranscriptionResponse & { mode: 'generate' }
 type HearingTranscriptionStreamResult = StreamTranscriptionResult & { mode: 'stream' }
 export type HearingTranscriptionResult = HearingTranscriptionGenerateResult | HearingTranscriptionStreamResult
 
@@ -40,12 +38,6 @@ type HearingTranscriptionInput = File | {
 
 interface HearingTranscriptionInvokeOptions {
   providerOptions?: Record<string, unknown>
-  /**
-   * Hint language for STT backend. Common values:
-   * - 'auto'
-   * - 'zh' | 'en' | 'ja'
-   */
-  language?: string
 }
 
 const STREAM_TRANSCRIPTION_EXECUTORS: Record<string, StreamTranscription> = {
@@ -91,15 +83,6 @@ export const useHearingStore = defineStore('hearing-store', () => {
     }
   }
 
-  // Keep provider model list fresh when user switches provider in Hearing settings UI.
-  watch(activeTranscriptionProvider, async (providerId) => {
-    if (providerId) {
-      // Persist provider selection so it doesn't disappear from the Hearing page selector.
-      providersStore.markProviderAdded(providerId)
-      await loadModelsForProvider(providerId)
-    }
-  }, { immediate: true })
-
   async function getModelsForProvider(provider: string) {
     if (provider && providersStore.getProviderMetadata(provider)?.capabilities.listModels !== undefined) {
       return providersStore.getModelsForProvider(provider)
@@ -142,12 +125,9 @@ export const useHearingStore = defineStore('hearing-store', () => {
     provider: TranscriptionProviderWithExtraOptions<string, any>,
     model: string,
     input: HearingTranscriptionInput,
-    format?: TranscriptionResponseFormat,
+    format?: 'json' | 'verbose_json',
     options?: HearingTranscriptionInvokeOptions,
   ): Promise<HearingTranscriptionResult> {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/783cccc2-5b30-488c-830d-4d552308c88b', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: 'debug-session', runId: 'pre-fix', hypothesisId: 'B', location: 'packages/stage-ui/src/stores/modules/hearing.ts:useHearingStore.transcription', message: 'enter transcription()', data: { providerId, model, format: format ?? 'default', hasFile: input instanceof File || !!(input as any)?.file, hasStream: !!(input as any)?.inputAudioStream }, timestamp: Date.now() }) }).catch(() => {})
-    // #endregion
     const normalizedInput = (input instanceof File ? { file: input } : input ?? {}) as {
       file?: File
       inputAudioStream?: ReadableStream<ArrayBuffer>
@@ -201,115 +181,14 @@ export const useHearingStore = defineStore('hearing-store', () => {
       throw new Error('File input is required for transcription.')
     }
 
-    const resolvedFormat: TranscriptionResponseFormat = format || 'json'
-
-    // NOTE: @xsai/generate-transcription currently supports only json / verbose_json.
-    // For response_format=text (VCS contract), we do a minimal multipart request manually,
-    // still using the provider's baseURL / headers / apiKey and returning a compatible shape.
-    if (resolvedFormat === 'text') {
-      const request = provider.transcription(model, options?.providerOptions) as {
-        baseURL: string | URL
-        apiKey?: string
-        headers?: Headers | Record<string, string>
-        fetch?: typeof globalThis.fetch
-      }
-
-      const baseURL = request.baseURL
-      const url = typeof baseURL === 'string'
-        ? `${baseURL}audio/transcriptions`
-        : new URL('audio/transcriptions', baseURL).toString()
-
-      const formData = new FormData()
-      formData.append('file', normalizedInput.file, (normalizedInput.file as any).name || 'audio.wav')
-      formData.append('model', model)
-      if (options?.language)
-        formData.append('language', options.language)
-      formData.append('response_format', 'text')
-
-      const fetchImpl = request.fetch || globalThis.fetch
-      const headers: Record<string, string> = {}
-      if (request.headers instanceof Headers) {
-        request.headers.forEach((value, key) => {
-          // Avoid forcing content-type for multipart
-          if (key.toLowerCase() !== 'content-type')
-            headers[key] = value
-        })
-      }
-      else if (request.headers && typeof request.headers === 'object') {
-        for (const [k, v] of Object.entries(request.headers)) {
-          if (k.toLowerCase() !== 'content-type')
-            headers[k] = v
-        }
-      }
-      if (request.apiKey)
-        headers.Authorization = `Bearer ${request.apiKey}`
-
-      const abortSignal = (options?.providerOptions as any)?.abortSignal as AbortSignal | undefined
-
-      const res = await fetchImpl(url as any, {
-        method: 'POST',
-        headers,
-        body: formData,
-        signal: abortSignal,
-      })
-
-      if (!res.ok) {
-        const ct = (res.headers.get('content-type') || '').toLowerCase()
-        if (ct.includes('application/json')) {
-          const err = await res.json().catch(() => ({} as any))
-          throw new Error(err?.error?.message || `HTTP ${res.status} ${res.statusText}`)
-        }
-        const detail = await res.text().catch(() => '')
-        throw new Error(detail || `HTTP ${res.status} ${res.statusText}`)
-      }
-
-      const text = await res.text()
-      return {
-        mode: 'generate',
-        responseFormat: 'text',
-        text,
-      }
-    }
-
-    const req = provider.transcription(model, options?.providerOptions) as any
-    const base = typeof req?.baseURL === 'string'
-      ? req.baseURL
-      : req?.baseURL instanceof URL
-        ? req.baseURL.toString()
-        : ''
-    const normalizeBaseUrlForLog = (input: string) => {
-      try {
-        const u = new URL(input)
-        return `${u.protocol}//${u.host}${u.pathname}`
-      }
-      catch {
-        return input
-      }
-    }
-    const baseUrlForLog = base ? normalizeBaseUrlForLog(base) : '(unknown)'
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/783cccc2-5b30-488c-830d-4d552308c88b', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: 'debug-session', runId: 'pre-fix', hypothesisId: 'B', location: 'packages/stage-ui/src/stores/modules/hearing.ts:useHearingStore.transcription', message: 'about to call generateTranscription', data: { providerId, model, responseFormat: resolvedFormat, baseURL: baseUrlForLog }, timestamp: Date.now() }) }).catch(() => {})
-    // #endregion
-
-    let response: any
-    try {
-      response = await generateTranscription({
-        ...req,
-        file: normalizedInput.file,
-        language: options?.language,
-        responseFormat: resolvedFormat === 'verbose_json' ? 'verbose_json' : 'json',
-      } as any)
-    }
-    catch (e) {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/783cccc2-5b30-488c-830d-4d552308c88b', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: 'debug-session', runId: 'pre-fix', hypothesisId: 'B', location: 'packages/stage-ui/src/stores/modules/hearing.ts:useHearingStore.transcription', message: 'generateTranscription threw', data: { providerId, model, error: String((e as any)?.message ?? e) }, timestamp: Date.now() }) }).catch(() => {})
-      // #endregion
-      throw e
-    }
+    const response = await generateTranscription({
+      ...provider.transcription(model, options?.providerOptions),
+      file: normalizedInput.file,
+      responseFormat: format,
+    })
 
     return {
       mode: 'generate',
-      responseFormat: resolvedFormat === 'verbose_json' ? 'verbose_json' : 'json',
       ...response,
     }
   }
@@ -342,20 +221,6 @@ export const useHearingSpeechInputPipeline = defineStore('modules:hearing:speech
   const hearingStore = useHearingStore()
   const { activeTranscriptionProvider, activeTranscriptionModel } = storeToRefs(hearingStore)
   const providersStore = useProvidersStore()
-  const settingsStore = useSettings()
-  const { language: uiLanguage } = storeToRefs(settingsStore)
-
-  const languageHint = computed(() => {
-    const lang = (uiLanguage.value || navigator.language || '').toLowerCase()
-    if (lang.startsWith('zh'))
-      return 'zh'
-    if (lang.startsWith('ja'))
-      return 'ja'
-    if (lang.startsWith('ko'))
-      return 'ko'
-    // Let provider decide for other languages / auto-detect.
-    return undefined
-  })
   const streamingSession = shallowRef<{
     audioContext: AudioContext | Record<string, never>
     workletNode: AudioWorkletNode | Record<string, never>
@@ -715,6 +580,7 @@ export const useHearingSpeechInputPipeline = defineStore('modules:hearing:speech
 
         return
       }
+
       const provider = await providersStore.getProviderInstance<TranscriptionProviderWithExtraOptions<string, any>>(providerId)
       if (!provider) {
         throw new Error('Failed to initialize speech provider')
@@ -722,16 +588,30 @@ export const useHearingSpeechInputPipeline = defineStore('modules:hearing:speech
 
       const idleTimeout = options?.idleTimeoutMs ?? DEFAULT_STREAM_IDLE_TIMEOUT
 
-      // If a session already exists, just bump the idle timer and reuse the websocket/audio graph.
+      // If a session exists, reuse it unless new callbacks are provided.
+      // The stream reader captures callbacks at creation time, so updated callbacks
+      // require restarting the session to create a new reader.
       const existingSession = streamingSession.value
       if (existingSession) {
-        if (existingSession.idleTimer) {
-          clearTimeout(existingSession.idleTimer)
-          existingSession.idleTimer = setTimeout(async () => {
-            await stopStreamingTranscription(false, existingSession.providerId)
-          }, idleTimeout)
+        const hasNewCallbacks
+          = options?.onSentenceEnd !== undefined
+            || options?.onSpeechEnd !== undefined
+
+        if (hasNewCallbacks) {
+          console.info('[Hearing Pipeline] New callbacks provided, restarting session')
+          await stopStreamingTranscription(false, existingSession.providerId)
+          // Fall through to create a new session with updated callbacks
         }
-        return
+        else {
+          // No callback changes: refresh idle timer and reuse session
+          if (existingSession.idleTimer) {
+            clearTimeout(existingSession.idleTimer)
+            existingSession.idleTimer = setTimeout(async () => {
+              await stopStreamingTranscription(false, existingSession.providerId)
+            }, idleTimeout)
+          }
+          return
+        }
       }
 
       const abortController = new AbortController()
@@ -767,7 +647,6 @@ export const useHearingSpeechInputPipeline = defineStore('modules:hearing:speech
             abortSignal: abortController.signal,
             ...options?.providerOptions,
           },
-          language: languageHint.value,
         },
       )
 
@@ -780,13 +659,24 @@ export const useHearingSpeechInputPipeline = defineStore('modules:hearing:speech
         result,
         idleTimer,
         providerId,
+        callbacks: {
+          onSentenceEnd: options?.onSentenceEnd,
+          onSpeechEnd: options?.onSpeechEnd,
+        },
       }
 
       // Stream out text deltas to caller without tearing down the session.
       if (result.mode === 'stream' && result.textStream) {
         void (async () => {
+          // Capture callbacks from the session at the time the reader is created
+          // This prevents cross-session leakage if the session is restarted before
+          // this reader finishes (e.g., when navigating between pages or callbacks change)
+          const sessionCallbacks = {
+            onSentenceEnd: streamingSession.value?.callbacks?.onSentenceEnd,
+            onSpeechEnd: streamingSession.value?.callbacks?.onSpeechEnd,
+          }
+
           let fullText = ''
-          let loggedFirst = false
           try {
             const reader = result.textStream.getReader()
 
@@ -796,13 +686,8 @@ export const useHearingSpeechInputPipeline = defineStore('modules:hearing:speech
                 break
               if (value) {
                 fullText += value
-                if (!loggedFirst) {
-                  loggedFirst = true
-                  // #region agent log
-                  fetch('http://127.0.0.1:7242/ingest/783cccc2-5b30-488c-830d-4d552308c88b', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: 'debug-session', runId: 'pre-fix', hypothesisId: 'B', location: 'packages/stage-ui/src/stores/modules/hearing.ts:transcribeForMediaStream', message: 'first text delta received', data: { providerId, deltaLen: value.length }, timestamp: Date.now() }) }).catch(() => {})
-                  // #endregion
-                }
-                options?.onSentenceEnd?.(value)
+                // Use captured callbacks to avoid cross-session leakage
+                sessionCallbacks.onSentenceEnd?.(value)
               }
             }
           }
@@ -810,10 +695,8 @@ export const useHearingSpeechInputPipeline = defineStore('modules:hearing:speech
             console.error('Error reading text stream:', err)
           }
           finally {
-            // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/783cccc2-5b30-488c-830d-4d552308c88b', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: 'debug-session', runId: 'pre-fix', hypothesisId: 'B', location: 'packages/stage-ui/src/stores/modules/hearing.ts:transcribeForMediaStream', message: 'stream ended', data: { providerId, fullLen: fullText.length }, timestamp: Date.now() }) }).catch(() => {})
-            // #endregion
-            options?.onSpeechEnd?.(fullText)
+            // Use captured callbacks to avoid cross-session leakage
+            sessionCallbacks.onSpeechEnd?.(fullText)
           }
         })()
       }
@@ -831,9 +714,6 @@ export const useHearingSpeechInputPipeline = defineStore('modules:hearing:speech
     try {
       if (recording && recording.size > 0) {
         const providerId = activeTranscriptionProvider.value
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/783cccc2-5b30-488c-830d-4d552308c88b', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: 'debug-session', runId: 'pre-fix', hypothesisId: 'B', location: 'packages/stage-ui/src/stores/modules/hearing.ts:transcribeForRecording', message: 'enter transcribeForRecording', data: { providerId, model: activeTranscriptionModel.value, blobSize: recording.size }, timestamp: Date.now() }) }).catch(() => {})
-        // #endregion
         const provider = await providersStore.getProviderInstance<TranscriptionProviderWithExtraOptions<string, any>>(providerId)
         if (!provider) {
           throw new Error('Failed to initialize speech provider')
@@ -846,23 +726,12 @@ export const useHearingSpeechInputPipeline = defineStore('modules:hearing:speech
           provider,
           model,
           new File([recording], 'recording.wav'),
-          undefined,
-          {
-            providerOptions: providersStore.getProviderConfig(providerId),
-            language: languageHint.value,
-          },
         )
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/783cccc2-5b30-488c-830d-4d552308c88b', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: 'debug-session', runId: 'pre-fix', hypothesisId: 'B', location: 'packages/stage-ui/src/stores/modules/hearing.ts:transcribeForRecording', message: 'transcription result received', data: { providerId, mode: result.mode, textLen: (result as any)?.text ? String((result as any).text).length : 0 }, timestamp: Date.now() }) }).catch(() => {})
-        // #endregion
         return result.mode === 'stream' ? await result.text : result.text
       }
     }
     catch (err) {
       error.value = err instanceof Error ? err.message : String(err)
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/783cccc2-5b30-488c-830d-4d552308c88b', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: 'debug-session', runId: 'pre-fix', hypothesisId: 'B', location: 'packages/stage-ui/src/stores/modules/hearing.ts:transcribeForRecording', message: 'transcribeForRecording failed', data: { error: error.value }, timestamp: Date.now() }) }).catch(() => {})
-      // #endregion
       console.error('Error generating transcription:', error.value)
     }
   }

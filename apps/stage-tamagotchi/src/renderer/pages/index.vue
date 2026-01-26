@@ -1,15 +1,12 @@
 <script setup lang="ts">
 import type { ChatProvider } from '@xsai-ext/providers/utils'
 
-import VoiceTraceOverlay from '@proj-airi/stage-ui/components/devtools/voice-trace-overlay.vue'
 import workletUrl from '@proj-airi/stage-ui/workers/vad/process.worklet?worker&url'
 
 import { useThreeSceneIsTransparentAtPoint } from '@proj-airi/stage-ui-three'
 import { WidgetStage } from '@proj-airi/stage-ui/components/scenes'
 import { useAudioRecorder } from '@proj-airi/stage-ui/composables/audio/audio-recorder'
 import { useCanvasPixelIsTransparentAtPoint } from '@proj-airi/stage-ui/composables/canvas-alpha'
-import { getSpeechBusContext, speechStopPendingEvent } from '@proj-airi/stage-ui/services/speech/bus'
-import { getVoiceTraceBusContext, voiceTraceLlmStartEvent, voiceTraceOverlayDragEvent } from '@proj-airi/stage-ui/services/voice-trace/bus'
 import { useVAD } from '@proj-airi/stage-ui/stores/ai/models/vad'
 import { useChatOrchestratorStore } from '@proj-airi/stage-ui/stores/chat'
 import { useLive2d } from '@proj-airi/stage-ui/stores/live2d'
@@ -19,7 +16,7 @@ import { useProvidersStore } from '@proj-airi/stage-ui/stores/providers'
 import { useSettings, useSettingsAudioDevice } from '@proj-airi/stage-ui/stores/settings'
 import { refDebounced, useBroadcastChannel } from '@vueuse/core'
 import { storeToRefs } from 'pinia'
-import { computed, onMounted, onUnmounted, ref, shallowRef, toRef, watch } from 'vue'
+import { computed, onUnmounted, ref, toRef, watch } from 'vue'
 
 import ControlsIsland from '../components/stage-islands/controls-island/index.vue'
 import ResourceStatusIsland from '../components/stage-islands/resource-status-island/index.vue'
@@ -48,24 +45,6 @@ const shouldFadeOnCursorWithin = ref(false)
 const { isOutside: isOutsideWindow } = useElectronMouseInWindow()
 const { isOutside } = useElectronMouseInElement(controlsIslandRef)
 const isOutsideFor250Ms = refDebounced(isOutside, 250)
-
-// Devtools overlay is teleported to <body>, so it is outside controlsIslandRef.
-// Treat it as interactive as well; otherwise Electron click-through breaks dragging.
-const overlayEl = shallowRef<HTMLElement | null>(null)
-onMounted(() => {
-  overlayEl.value = document.getElementById('airi-voice-trace-overlay')
-})
-const { isOutside: isOutsideOverlay } = useElectronMouseInElement(overlayEl)
-const isOutsideOverlayFor250Ms = refDebounced(isOutsideOverlay, 250)
-
-const overlayDragging = ref(false)
-const voiceTrace = getVoiceTraceBusContext()
-const speechBus = getSpeechBusContext()
-voiceTrace.on(voiceTraceOverlayDragEvent, (evt: unknown) => {
-  const payload = (evt as any)?.body as { dragging?: boolean } | undefined
-  if (payload && typeof payload.dragging === 'boolean')
-    overlayDragging.value = payload.dragging
-})
 const { x: relativeMouseX, y: relativeMouseY } = useElectronRelativeMouse()
 // NOTICE: In real-world use cases of Fade on Hover feature, the cursor may move around the edge of the
 // model rapidly, causing flickering effects when checking pixel transparency strictly.
@@ -121,7 +100,7 @@ watch([isOutsideFor250Ms, isAroundWindowBorderFor250Ms, isOutsideWindow, isTrans
     return
   }
 
-  const insideControls = !isOutsideFor250Ms.value || !isOutsideOverlayFor250Ms.value || overlayDragging.value
+  const insideControls = !isOutsideFor250Ms.value
   const nearBorder = isAroundWindowBorderFor250Ms.value
 
   if (insideControls || nearBorder) {
@@ -161,12 +140,6 @@ const { activeProvider: activeChatProvider, activeModel: activeChatModel } = sto
 const chatStore = useChatOrchestratorStore()
 const shouldUseStreamInput = computed(() => supportsStreamInput.value && !!stream.value)
 
-watch(stream, (s) => {
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/783cccc2-5b30-488c-830d-4d552308c88b', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: 'debug-session', runId: 'run2', hypothesisId: 'E', location: 'apps/stage-tamagotchi/src/renderer/pages/index.vue:watch(stream)', message: 'stream changed', data: { hasStream: !!s, tracks: s?.getTracks?.()?.length ?? 0 }, timestamp: Date.now() }) }).catch(() => {})
-  // #endregion
-}, { immediate: true })
-
 const {
   init: initVAD,
   dispose: disposeVAD,
@@ -195,6 +168,7 @@ async function handleSpeechStart() {
   fetch('http://127.0.0.1:7242/ingest/783cccc2-5b30-488c-830d-4d552308c88b', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: 'debug-session', runId: 'pre-fix', hypothesisId: 'A', location: 'apps/stage-tamagotchi/src/renderer/pages/index.vue:handleSpeechStart', message: 'VAD speech-start handler called', data: { shouldUseStreamInput: shouldUseStreamInput.value, hasStream: !!stream.value }, timestamp: Date.now() }) }).catch(() => {})
   // #endregion
 
+  console.info('[Main Page] Speech detected', { shouldUseStreamInput: shouldUseStreamInput.value, hasStream: !!stream.value })
   // Barge-in: stop any ongoing TTS as soon as user starts speaking.
   speechBus.emit(speechStopPendingEvent, { originId: 'stage-tamagotchi:index', reason: 'barge-in:speech-start' })
   if (shouldUseStreamInput.value && stream.value) {
@@ -283,9 +257,6 @@ async function startAudioInteraction() {
       if (!text || !text.trim())
         return
 
-      // New STT text implies a new turn; soft-stop backlog but finish current segment.
-      speechBus.emit(speechStopPendingEvent, { originId: 'stage-tamagotchi:index', reason: 'barge-in:stt' })
-
       // Update caption overlay speaker text via BroadcastChannel
       postCaption({ type: 'caption-speaker', text })
       // #region agent log
@@ -293,20 +264,13 @@ async function startAudioInteraction() {
       // #endregion
 
       try {
-        speechBus.emit(speechStopPendingEvent, { originId: 'stage-tamagotchi:index', reason: 'barge-in:llm-start' })
-        voiceTrace.emit(voiceTraceLlmStartEvent, {
-          originId: 'stage-tamagotchi:index',
-          at: Date.now(),
-          meta: {
-            source: 'voice',
-            providerId: activeChatProvider.value,
-            model: activeChatModel.value ?? undefined,
-          },
-        })
+        // New STT text implies a new turn; soft-stop backlog but finish current segment.
+        speechBus.emit(speechStopPendingEvent, { originId: 'stage-tamagotchi:index', reason: 'barge-in:stt' })
         const provider = await providersStore.getProviderInstance(activeChatProvider.value)
         if (!provider || !activeChatModel.value)
           return
 
+        speechBus.emit(speechStopPendingEvent, { originId: 'stage-tamagotchi:index', reason: 'barge-in:llm-start' })
         await chatStore.ingest(text, { model: activeChatModel.value, chatProvider: provider as ChatProvider })
       }
       catch (err) {
@@ -353,9 +317,6 @@ watch([stream, () => vadLoaded.value], async ([s, loaded]) => {
   // #endregion
   if (enabled.value && loaded && s) {
     try {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/783cccc2-5b30-488c-830d-4d552308c88b', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: 'debug-session', runId: 'run2', hypothesisId: 'E', location: 'apps/stage-tamagotchi/src/renderer/pages/index.vue:startVAD', message: 'calling startVAD(stream)', data: { tracks: s.getTracks().length }, timestamp: Date.now() }) }).catch(() => {})
-      // #endregion
       await startVAD(s)
     }
     catch (e) {
@@ -476,7 +437,6 @@ watch([stream, () => vadLoaded.value], async ([s, loaded]) => {
       />
     </div>
   </Transition>
-  <VoiceTraceOverlay />
 </template>
 
 <style scoped>

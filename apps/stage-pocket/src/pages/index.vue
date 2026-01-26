@@ -48,7 +48,7 @@ const settingsAudioDeviceStore = useSettingsAudioDevice()
 const { stream, enabled } = storeToRefs(settingsAudioDeviceStore)
 const { startRecord, stopRecord, onStopRecord } = useAudioRecorder(stream)
 const hearingPipeline = useHearingSpeechInputPipeline()
-const { transcribeForRecording, transcribeForMediaStream } = hearingPipeline
+const { transcribeForRecording, transcribeForMediaStream, stopStreamingTranscription } = hearingPipeline
 const { supportsStreamInput } = storeToRefs(hearingPipeline)
 const providersStore = useProvidersStore()
 const consciousnessStore = useConsciousnessStore()
@@ -117,6 +117,8 @@ async function startAudioInteraction() {
 
 async function handleSpeechStart() {
   if (shouldUseStreamInput.value && stream.value) {
+    // Use both callbacks to support incremental updates and final transcript replacement.
+    // ChatArea uses only onSentenceEnd to avoid re-adding deleted text.
     await transcribeForMediaStream(stream.value, {
       onSentenceEnd: (delta) => {
         const finalText = delta
@@ -168,6 +170,8 @@ function stopAudioInteraction() {
   try {
     stopOnStopRecord?.()
     stopOnStopRecord = undefined
+    // Stop any active streaming transcription sessions to prevent session leakage
+    void stopStreamingTranscription(true)
     disposeVAD()
   }
   catch {}
