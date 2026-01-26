@@ -718,7 +718,6 @@ export const useHearingSpeechInputPipeline = defineStore('modules:hearing:speech
 
         return
       }
-
       const provider = await providersStore.getProviderInstance<TranscriptionProviderWithExtraOptions<string, any>>(providerId)
       if (!provider) {
         throw new Error('Failed to initialize speech provider')
