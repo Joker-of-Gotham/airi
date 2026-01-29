@@ -268,9 +268,6 @@ const speechPipeline = createSpeechPipeline<AudioBuffer>({
       return null
 
     const providerConfig = providersStore.getProviderConfig(activeSpeechProvider.value)
-    const input = ssmlEnabled.value
-      ? speechStore.generateSSML(request.text, activeSpeechVoice.value, { ...providerConfig, pitch: pitch.value, speed: rate.value })
-      : request.text
 
     // For OpenAI Compatible providers, always use provider config for model and voice
     // since these are manually configured in provider settings
