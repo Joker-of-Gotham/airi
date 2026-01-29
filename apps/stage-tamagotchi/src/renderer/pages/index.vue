@@ -335,9 +335,6 @@ watch(enabled, async (val) => {
   fetch('http://127.0.0.1:7242/ingest/783cccc2-5b30-488c-830d-4d552308c88b', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: 'debug-session', runId: 'pre-fix', hypothesisId: 'A', location: 'apps/stage-tamagotchi/src/renderer/pages/index.vue:watch(enabled)', message: 'audio interaction enabled toggled', data: { enabled: val }, timestamp: Date.now() }) }).catch(() => {})
   // #endregion
   console.info('[Main Page] Audio enabled changed:', val, 'stream available:', !!stream.value)
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/783cccc2-5b30-488c-830d-4d552308c88b', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: 'debug-session', runId: 'pre-fix', hypothesisId: 'A', location: 'apps/stage-tamagotchi/src/renderer/pages/index.vue:watch(enabled)', message: 'audio interaction enabled toggled', data: { enabled: val }, timestamp: Date.now() }) }).catch(() => {})
-  // #endregion
   if (val) {
     await askPermission()
     await startAudioInteraction()

@@ -486,11 +486,6 @@ onMounted(async () => {
   syncOpenAICompatibleSettings()
 })
 
-onMounted(async () => {
-  // Audio devices are loaded on demand when user requests them
-  syncOpenAICompatibleSettings()
-})
-
 onUnmounted(() => {
   stopSTTTest()
   stopAudioMonitoring()

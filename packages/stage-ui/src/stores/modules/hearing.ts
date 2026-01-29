@@ -572,10 +572,6 @@ export const useHearingSpeechInputPipeline = defineStore('modules:hearing:speech
       fetch('http://127.0.0.1:7242/ingest/783cccc2-5b30-488c-830d-4d552308c88b', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: 'debug-session', runId: 'pre-fix', hypothesisId: 'B', location: 'packages/stage-ui/src/stores/modules/hearing.ts:transcribeForMediaStream', message: 'enter transcribeForMediaStream', data: { providerId, model: activeTranscriptionModel.value, supportsStreamInput: supportsStreamInput.value, hasExistingSession: !!streamingSession.value }, timestamp: Date.now() }) }).catch(() => {})
       // #endregion
 
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/783cccc2-5b30-488c-830d-4d552308c88b', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: 'debug-session', runId: 'pre-fix', hypothesisId: 'B', location: 'packages/stage-ui/src/stores/modules/hearing.ts:transcribeForMediaStream', message: 'enter transcribeForMediaStream', data: { providerId, model: activeTranscriptionModel.value, supportsStreamInput: supportsStreamInput.value, hasExistingSession: !!streamingSession.value }, timestamp: Date.now() }) }).catch(() => {})
-      // #endregion
-
       // Special handling for Web Speech API - it works directly with MediaStream
       if (providerId === 'browser-web-speech-api') {
         // Check if Web Speech API is available

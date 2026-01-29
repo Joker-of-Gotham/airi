@@ -167,7 +167,6 @@ const routeHeaderMetadata = computed(() => {
   const mapEntry = routeHeaderMetadataMap.value[route.path]
   if (mapEntry)
     return mapEntry
-
   return undefined
 })
 </script>
