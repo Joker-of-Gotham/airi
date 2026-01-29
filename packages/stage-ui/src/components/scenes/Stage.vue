@@ -317,8 +317,8 @@ const speechPipeline = createSpeechPipeline<AudioBuffer>({
     if (!model || !voice)
       return null
 
-  const input = ssmlEnabled.value
-    ? speechStore.generateSSML(request.text, voice, { ...providerConfig, pitch: pitch.value, speed: rate.value })
+    const input = ssmlEnabled.value
+      ? speechStore.generateSSML(request.text, voice, { ...providerConfig, pitch: pitch.value, speed: rate.value })
       : request.text
 
     try {
