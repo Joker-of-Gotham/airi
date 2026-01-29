@@ -1,4 +1,4 @@
-use std::{path::PathBuf, sync::Arc};
+use std::{path::PathBuf, sync::{Arc, Mutex}};
 
 use anyhow::Result;
 use hf_hub::Repo;
@@ -11,7 +11,6 @@ use ort::{
     DirectMLExecutionProvider,
   },
   session::{Session, builder::GraphOptimizationLevel},
-  util::Mutex,
   value::Tensor,
 };
 use serde::{Deserialize, Serialize};
@@ -130,7 +129,7 @@ impl Processor {
 
     // Run inference and extract data while session is still locked
     let (state_data, speech_data) = {
-      let mut session = self.session.lock();
+      let mut session = self.session.lock().map_err(|err| anyhow::anyhow!(err.to_string()))?;
       let outputs = session.run(inputs)?;
 
       // Extract and clone the data immediately while session is locked

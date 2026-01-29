@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import type { Ref } from 'vue'
+
 import workletUrl from '@proj-airi/stage-ui/workers/vad/process.worklet?worker&url'
 
 import { Alert, ErrorContainer, LevelMeter, RadioCardManySelect, RadioCardSimple, TestDummyMarker, ThresholdMeter, TimeSeriesChart } from '@proj-airi/stage-ui/components'
@@ -61,6 +63,12 @@ const audioURLs = computed(() => {
     audioCleanups.value.push(() => URL.revokeObjectURL(url))
     return url
   })
+})
+const audioInputOptions = computed(() => {
+  return audioInputs.value.map((input: MediaDeviceInfo) => ({
+    label: input.label || input.deviceId,
+    value: input.deviceId,
+  }))
 })
 
 // Speech-to-Text test state
@@ -336,7 +344,7 @@ async function startSTTTest() {
 
       // Wait for the stream to become available with a 3-second timeout.
       try {
-        await until(stream).toBeTruthy({ timeout: 3000, throwOnTimeout: true })
+        await until(stream as Ref<MediaStream | undefined>).toBeTruthy({ timeout: 3000, throwOnTimeout: true })
       }
       catch {
         handleStreamStartError()
@@ -510,10 +518,7 @@ onUnmounted(() => {
             v-model="selectedAudioInput"
             :label="t('settings.pages.providers.provider.transcriptions.playground.audio_input_device.label')"
             :description="t('settings.pages.providers.provider.transcriptions.playground.audio_input_device.description')"
-            :options="audioInputs.map(input => ({
-              label: input.label || input.deviceId,
-              value: input.deviceId,
-            }))"
+            :options="audioInputOptions"
             :placeholder="t('settings.pages.providers.provider.transcriptions.playground.audio_input_device.placeholder')"
             layout="vertical"
           />
