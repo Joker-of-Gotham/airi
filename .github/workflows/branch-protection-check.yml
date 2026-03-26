@@ -1,0 +1,30 @@
+name: Check branch protection on main
+
+on:
+  pull_request_target:
+    branches: [main]
+
+jobs:
+  check-protection:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify main branch protection
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const result = await github.repos.getBranchProtection({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              branch: 'main'
+            }).then(r=>r.data).catch(err=>{
+              if(err.status===404){
+                return null;
+              } else {
+                throw err;
+              }
+            });
+            if (!result){
+              core.setFailed('Branch protection on main is not enabled. Please enable via repository settings.');
+            }
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
