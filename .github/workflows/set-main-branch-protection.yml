@@ -24,7 +24,9 @@ jobs:
           branch: main
           required_status_checks:
             strict: false
-            contexts: []
+            contexts:
+              - ci.yml
+
           required_pull_request_reviews:
             required_approving_review_count: 1
             dismiss_stale_reviews: true
