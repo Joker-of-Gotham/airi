@@ -1,0 +1,30 @@
+name: Set Main Branch Protection
+
+on:
+  push:
+    branches:
+      - main
+  schedule:
+    - cron: '0 0 * * 0' # Weekly check
+
+jobs:
+  protect:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Set branch protection
+        uses: peter-evans/create-or-update-branch-protection@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          owner: ${{ github.repository_owner }}
+          repo: ${{ github.event.repository.name }}
+          branch: main
+          required_status_checks: '[]'
+          required_pull_request_reviews:
+            required_approving_review_count: 1
+            dismiss_stale_reviews: true
+            require_code_owner_reviews: true
+          enforce_admins: true
+          restrictions: '[]'
