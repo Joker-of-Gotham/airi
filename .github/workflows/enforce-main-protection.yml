@@ -1,12 +1,10 @@
 name: Enforce Main Branch Protection
 
-on:
-  pull_request:
-    branches:
-      - main
+on: none
 
 jobs:
   check-protection:
+    if: github.ref_name == 'main'
     runs-on: ubuntu-latest
     steps:
       - name: Check main branch protection

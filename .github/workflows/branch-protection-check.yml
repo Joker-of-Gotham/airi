@@ -23,7 +23,7 @@ jobs:
                 throw err;
               }
             });
-            if (!result){
+            if (!result) {
               core.setFailed('Branch protection on main is not enabled. Please enable via repository settings.');
             }
         env:
