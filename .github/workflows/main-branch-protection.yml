@@ -8,6 +8,9 @@ on:
 jobs:
   check-protection:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
     steps:
       - name: Check main branch protection
         uses: actions/github-script@v6

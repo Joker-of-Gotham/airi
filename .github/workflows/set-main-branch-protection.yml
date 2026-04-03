@@ -6,7 +6,7 @@ on:
       - main
   schedule:
     - cron: '0 0 * * 0' # Weekly check
-  workflow_dispatch
+  workflow_dispatch: {}
 
 jobs:
   protect:
@@ -14,6 +14,7 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
+      administration: write
     steps:
       - name: Set branch protection
         uses: peter-evans/create-or-update-branch-protection@v3
