@@ -6,6 +6,8 @@ on:
 
 jobs:
   check-protection:
+    # Only run in the upstream repository, not in forks
+    if: github.repository == 'moeru-ai/airi'
     runs-on: ubuntu-latest
     steps:
       - name: Verify main branch protection
