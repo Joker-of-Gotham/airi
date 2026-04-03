@@ -1,8 +1,9 @@
 name: Crowdin sync translations from remote
 
 on:
-  schedule:
-    - cron: '2 1 * * *' # random time every day
+  # Disable scheduled runs in forks - they require CROWDIN_PERSONAL_TOKEN secret not available
+  # schedule:
+  #   - cron: '2 1 * * *' # random time every day
   workflow_dispatch:
 
 permissions:
@@ -12,6 +13,8 @@ permissions:
 jobs:
   sync-transitions-from-crowdin:
     runs-on: ubuntu-latest
+    # Skip if Crowdin token is not available (e.g., in forks)
+    if: ${{ secrets.CROWDIN_PERSONAL_TOKEN != '' }}
     steps:
       - uses: actions/checkout@v6
       - uses: crowdin/github-action@v2

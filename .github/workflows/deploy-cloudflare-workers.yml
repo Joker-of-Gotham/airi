@@ -13,6 +13,8 @@ jobs:
   deploy:
     name: Deploy - ${{ matrix.app_name }}
     runs-on: ubuntu-latest
+    # Skip if Cloudflare secrets are not available (e.g., in forks)
+    if: ${{ secrets.CLOUDFLARE_API_TOKEN != '' && secrets.CLOUDFLARE_ACCOUNT_ID != '' }}
     permissions:
       contents: read
       deployments: write

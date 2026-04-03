@@ -19,6 +19,8 @@ jobs:
   release:
     name: Release
     runs-on: ubuntu-latest
+    # Skip if crates.io token is not available
+    if: ${{ secrets.CRATES_IO_API_TOKEN != '' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
