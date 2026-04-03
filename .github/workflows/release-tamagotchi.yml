@@ -44,8 +44,9 @@ on:
         required: false
         default: false
         type: boolean
-  schedule:
-    - cron: '0 0 * * *'
+  # Disable scheduled runs in forks
+  # schedule:
+  #   - cron: '0 0 * * *'
 
 jobs:
   build:
