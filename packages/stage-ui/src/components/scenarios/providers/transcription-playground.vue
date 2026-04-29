@@ -1,14 +1,14 @@
 <script setup lang="ts">
 import type { HearingTranscriptionResult } from '../../../stores/modules/hearing'
 
-import { Button, FieldRange, FieldSelect } from '@proj-airi/ui'
+import { Button, FieldCombobox, FieldRange } from '@proj-airi/ui'
 import { until } from '@vueuse/core'
 import { computed, onUnmounted, ref, shallowRef, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
+import { useAudioDevice } from '../../../composables/audio'
 import { useAudioAnalyzer } from '../../../composables/audio/audio-analyzer'
 import { useAudioRecorder } from '../../../composables/audio/audio-recorder'
-import { useAudioDevice } from '../../../composables/audio/device'
 import { LevelMeter, TestDummyMarker, ThresholdMeter } from '../../gadgets'
 
 const props = defineProps<{
@@ -216,7 +216,7 @@ onUnmounted(() => {
 
     <!-- Audio Input Selection -->
     <div mb-2>
-      <FieldSelect
+      <FieldCombobox
         v-model="selectedAudioInput"
         :label="t('settings.pages.providers.provider.transcriptions.playground.audio_input_device.label')"
         :description="t('settings.pages.providers.provider.transcriptions.playground.audio_input_device.description')"

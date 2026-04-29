@@ -13,7 +13,7 @@ jobs:
   generate:
     runs-on: ubuntu-latest
     # Skip if sponsor secrets are not available (e.g., in forks)
-    if: ${{ secrets.SPONSORKIT_PATREON_TOKEN != '' || secrets.SPONSORKIT_OPENCOLLECTIVE_KEY != '' }}
+    if: ${{ github.repository == 'moeru-ai/airi' }}
     env:
       SPONSORKIT_PATREON_TOKEN: ${{ secrets.SPONSORKIT_PATREON_TOKEN }}
       SPONSORKIT_OPENCOLLECTIVE_KEY: ${{ secrets.SPONSORKIT_OPENCOLLECTIVE_KEY }}

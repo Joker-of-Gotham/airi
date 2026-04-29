@@ -1,7 +1,7 @@
 {
   "name": "@proj-airi/twitter-services",
   "type": "module",
-  "version": "0.8.3",
+  "version": "0.9.0",
   "private": true,
   "description": "Twitter Services for MCP",
   "author": "RainbowBird <rbxin2003@outlook.com>",
@@ -12,15 +12,12 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@browserbasehq/stagehand": "^3.0.7",
     "@guiiai/logg": "catalog:",
-    "@modelcontextprotocol/sdk": "^1.25.3",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "@moeru/std": "catalog:",
-    "@proj-airi/server-sdk": "^0.8.1",
-    "h3": "^2.0.1-rc.11",
-    "listhen": "^1.9.0",
-    "ofetch": "^1.5.1",
-    "playwright": "^1.57.0",
-    "zod": "^4.3.5"
+    "@proj-airi/server-sdk": "workspace:*",
+    "h3": "2.0.1-rc.20",
+    "playwright": "^1.59.1",
+    "zod": "^4.3.6"
   }
 }

@@ -1,120 +1,76 @@
 # AIRI Satori Bot
 
-一个基于 Satori 协议的 AI 聊天机器人，可以通过 Koishi 连接到多个聊天平台（QQ、Telegram、Discord、飞书等）。
+> **⚠️ Disclaimer**: This is a submodule of **AIRI**. The `core` part of this satori bot is merely a **temporary solution**. We will eventually delete it and integrate with **AIRI's Core** once the main framework is stable.
 
-## 架构说明
+A **STANDALONE**, event-driven AI agent built on the [Satori Protocol](https://satori.chat/). It connects to multiple chat platforms (QQ, Telegram, Discord, Lark) via a Koishi bridge, featuring an autonomous thought loop.
 
-本项目采用**独立架构**，参考了 Telegram Bot 的实现模式
+## 🏗 Architecture & Internals (Provisional)
 
-## 前置要求
+**Important**: This module currently implements a self-contained "Mini-Core" (`src/core/`) to operate independently. This is **NOT** the final architecture of AIRI.
 
-1. **Koishi 实例**：需要一个运行中的 Koishi 实例，并启用 Satori 服务
-2. **LLM API**：OpenAI API 或兼容的 API（如 Ollama、vLLM 等）
-3. **Node.js**: >= 18.0.0
-4. **pnpm**: >= 8.0.0
+* **Temporary Logic**: The Event Loop, Scheduler, and Planner logic located in `src/core/` are placeholders. They simulate the behavior of the future AIRI Core.
+* **Retained Components**: The **Dispatcher** and **Database** will be retained. They will be exposed as **tool-like modules** to the AIRI Core for action execution and state persistence.
+* **Future Migration**: Once the main AIRI Core is ready, the `src/core/` directory (specifically the loop/planning logic) will be removed. This module will then be refactored to strictly function as an **Adapter** (Satori Protocol handling) and **Capability Provider** (Actions), delegating the cognitive loop to the main AIRI process.
 
-## 安装
+For the current standalone version, please refer to these documents:
 
+* **[HANDLER.md](./docs/HANDLER.md)**: Explains the **current** Event-to-Action Flow (Queue -> Scheduler -> LLM).
+* **[PERSISTENCE.md](./docs/PERSISTENCE.md)**: Details the **current** Memory-First state management strategy specific to this temporary core.
+
+**Key Code Paths:**
+* **Loop & Logic (Temporary)**: `src/core/`
+* **Adapter (Permanent)**: `src/adapter/satori/`
+* **Capabilities (Permanent)**: `src/capabilities/`
+
+## Prerequisites
+
+* **Node.js** >= 18.0.0
+* **pnpm** >= 8.0.0
+* **Koishi Instance**: Running the `server-satori` plugin.
+* **LLM Provider**: OpenAI compatible API (Ollama, vLLM, DeepSeek, etc.).
+
+## Quick Start
+
+1. **Install Dependencies**
 ```bash
-# 在项目根目录
 pnpm install
 ```
 
-## 配置
-
-复制 `.env` 文件并修改配置：
+2. **Configure Environment**
+Copy the example config and edit it:
 
 ```bash
-# 在 services/satori-bot 目录
 cp .env .env.local
 ```
 
-编辑 `.env.local`：
+**Key Variables:**
 
 ```env
 # Satori Configuration
 SATORI_WS_URL=ws://localhost:5140/satori/v1/events
 SATORI_API_BASE_URL=http://localhost:5140/satori/v1
-SATORI_TOKEN=your_satori_token_here
+SATORI_TOKEN= # Optional: Leave empty if auth is disabled in Koishi
 
-# LLM Configuration
+# LLM (OpenAI Compatible)
 LLM_API_KEY=your_api_key_here
 LLM_API_BASE_URL=https://api.openai.com/v1
 LLM_MODEL=gpt-4
-LLM_RESPONSE_LANGUAGE=简体中文
+LLM_RESPONSE_LANGUAGE=English
 LLM_OLLAMA_DISABLE_THINK=false
 ```
 
-### 配置说明
-
-#### Satori 配置
-
-- `SATORI_WS_URL`: Satori WebSocket 地址（Koishi 默认：`ws://localhost:5140/satori/v1/events`）
-- `SATORI_API_BASE_URL`: Satori HTTP API 地址（Koishi 默认：`http://localhost:5140/satori/v1`）
-- `SATORI_TOKEN`: Satori 认证令牌（在 Koishi 配置中获取，如果为空 请留空，如：`SATORI_TOKEN=`）
-
-**重要**: Koishi 的 Satori 服务默认路由是 `/satori/v1`，因此完整的 API 路径会自动拼接，例如：
-- 发送消息: `http://localhost:5140/satori/v1/message.create`
-- 获取消息: `http://localhost:5140/satori/v1/message.get`
-
-#### LLM 配置
-
-- `LLM_API_KEY`: LLM API 密钥
-- `LLM_API_BASE_URL`: LLM API 地址
-- `LLM_MODEL`: 使用的模型名称
-- `LLM_RESPONSE_LANGUAGE`: 回复语言（默认：简体中文）
-- `LLM_OLLAMA_DISABLE_THINK`: 是否禁用 Ollama 的思考模式
-
-## 使用
-
-### 开发模式
+3. **Run**
 
 ```bash
-# 在项目根目录
+# Development (Hot-reload)
 pnpm --filter @proj-airi/satori-bot dev
-```
 
-### 生产模式
-
-```bash
-# 在项目根目录
+# Production
 pnpm --filter @proj-airi/satori-bot start
 ```
 
-### 类型检查
+## Key Locations
 
-```bash
-# 在项目根目录
-pnpm --filter @proj-airi/satori-bot typecheck
-```
-
-## 常见问题
-
-### 1. 如何配置 Koishi？
-
-在 Koishi 中启用 `server-satori`，配置项保持默认即可，无需改动。
-
-### 2. 如何自定义 AI 人格？
-
-可以编辑以下文件：
-
-- `services\satori-bot\src\prompts\personality-v1.velin.md`
-- `services\satori-bot\src\prompts\system-action-gen-v1.velin.md`
-
-### 3. 数据库文件在哪里？
-
-`services/satori-bot/data/db.json`
-
-## 贡献
-
-欢迎提交 Issue 和 Pull Request！
-
-## 许可证
-
-MIT License
-
-## 相关链接
-
-- [AIRI 项目](https://github.com/moeru-ai/airi)
-- [Satori 协议文档](https://satori.chat/)
-- [Koishi 文档](https://koishi.chat/)
+* **Persona & System Prompts**: `src/core/planner/prompts/*.velin.md`
+* **Database (PGlite)**: `data/pglite-db` (See *PERSISTENCE.md* for architecture)
+* **Action Logic**: `src/capabilities/actions/`

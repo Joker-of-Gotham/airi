@@ -4,6 +4,7 @@ import type { AuthenticatedPeer } from '../../types'
 
 function globToRegExp(glob: string) {
   const escaped = glob.replace(/[.+^${}()|[\]\\]/g, '\\$&')
+
   const pattern = `^${escaped.replace(/\*/g, '.*')}$`
   return new RegExp(pattern)
 }
@@ -17,7 +18,10 @@ function matchesGlob(glob: string, value?: string) {
 }
 
 export function matchesLabelSelector(selector: string, labels: Record<string, string>) {
-  const [key, value] = selector.split('=', 2)
+  const [rawKey, rawValue] = selector.split('=', 2)
+  const key = rawKey?.trim()
+  const value = rawValue?.trim()
+
   if (!key) {
     return false
   }
@@ -33,16 +37,24 @@ export function matchesLabelSelectors(selectors: string[], labels: Record<string
   return selectors.every(selector => matchesLabelSelector(selector, labels))
 }
 
-export function matchesRouteExpression(expression: RouteTargetExpression, peer: AuthenticatedPeer) {
+function getPeerLabels(peer: AuthenticatedPeer) {
+  return {
+    ...peer.identity?.plugin?.labels,
+    ...peer.identity?.labels,
+  }
+}
+
+export function matchesRouteExpression(expression: RouteTargetExpression, peer: AuthenticatedPeer): boolean {
   switch (expression.type) {
     case 'and':
       return expression.all.every(expr => matchesRouteExpression(expr, peer))
     case 'or':
       return expression.any.some(expr => matchesRouteExpression(expr, peer))
     case 'glob': {
+      const pluginId = peer.identity?.plugin?.id
       const matched = matchesGlob(expression.glob, peer.name)
-        || matchesGlob(expression.glob, peer.identity?.plugin)
-        || matchesGlob(expression.glob, peer.identity?.instanceId)
+        || matchesGlob(expression.glob, pluginId)
+        || matchesGlob(expression.glob, peer.identity?.id)
 
       return expression.inverted ? !matched : matched
     }
@@ -51,15 +63,15 @@ export function matchesRouteExpression(expression: RouteTargetExpression, peer: 
       return expression.inverted ? !matched : matched
     }
     case 'plugin': {
-      const matched = expression.plugins.includes(peer.identity?.plugin ?? '')
+      const matched = expression.plugins.includes(peer.identity?.plugin?.id ?? '')
       return expression.inverted ? !matched : matched
     }
     case 'instance': {
-      const matched = expression.instances.includes(peer.identity?.instanceId ?? '')
+      const matched = expression.instances.includes(peer.identity?.id ?? '')
       return expression.inverted ? !matched : matched
     }
     case 'label': {
-      const matched = matchesLabelSelectors(expression.selectors, peer.identity?.labels ?? {})
+      const matched = matchesLabelSelectors(expression.selectors, getPeerLabels(peer))
       return expression.inverted ? !matched : matched
     }
     case 'module': {
@@ -89,21 +101,23 @@ export function matchesDestination(destination: string | RouteTargetExpression, 
 
   switch (prefix) {
     case 'plugin':
-      return peer.identity?.plugin === value
+      return peer.identity?.plugin?.id === value
     case 'instance':
-      return peer.identity?.instanceId === value
+      return peer.identity?.id === value
     case 'label':
-      return matchesLabelSelectors([value], peer.identity?.labels ?? {})
+      return matchesLabelSelectors([value], getPeerLabels(peer))
     case 'peer':
       return peer.peer.id === value
     case 'module':
       return peer.name === value
     case 'source':
       return peer.name === value
-    default:
+    default: {
+      const pluginId = peer.identity?.plugin?.id
       return matchesGlob(destination, peer.name)
-        || matchesGlob(destination, peer.identity?.plugin)
-        || matchesGlob(destination, peer.identity?.instanceId)
+        || matchesGlob(destination, pluginId)
+        || matchesGlob(destination, peer.identity?.id)
+    }
   }
 }
 

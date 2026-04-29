@@ -93,9 +93,6 @@ function enableStageMic() {
   if (!stageMicDeviceId.value)
     stageMicDeviceId.value = 'default'
   stageMicEnabled.value = true
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/783cccc2-5b30-488c-830d-4d552308c88b', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: 'debug-session', runId: 'pre-fix', hypothesisId: 'A', location: 'packages/stage-ui/src/components/devtools/voice-trace-overlay.vue:enableStageMic', message: 'enable stage mic via localStorage', data: { stageMicDeviceId: stageMicDeviceId.value }, timestamp: Date.now() }) }).catch(() => {})
-  // #endregion
 }
 
 async function startMicMonitoring() {
@@ -174,19 +171,7 @@ watch(captionEvent, (evt) => {
   if (evt.type === 'caption-speaker')
     sttText.value = evt.text
   lastCaption.value = { type: evt.type, len: typeof (evt as any).text === 'string' ? (evt as any).text.length : 0, at: Date.now() }
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/783cccc2-5b30-488c-830d-4d552308c88b', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: 'debug-session', runId: 'pre-fix', hypothesisId: 'C', location: 'packages/stage-ui/src/components/devtools/voice-trace-overlay.vue:captionEvent', message: 'caption event received', data: { type: evt.type, len: typeof (evt as any).text === 'string' ? (evt as any).text.length : 0 }, timestamp: Date.now() }) }).catch(() => {})
-  // #endregion
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/783cccc2-5b30-488c-830d-4d552308c88b', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: 'debug-session', runId: 'run3', hypothesisId: 'C', location: 'packages/stage-ui/src/components/devtools/voice-trace-overlay.vue:captionEvent', message: 'caption->sttText update', data: { sttTextLen: sttText.value.length, lastCaption: lastCaption.value }, timestamp: Date.now() }) }).catch(() => {})
-  // #endregion
   // caption-assistant is emitted from Stage playback events; LLM output should be observed via voice-trace bus.
-})
-
-watch(sttText, (v) => {
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/783cccc2-5b30-488c-830d-4d552308c88b', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: 'debug-session', runId: 'run3', hypothesisId: 'C', location: 'packages/stage-ui/src/components/devtools/voice-trace-overlay.vue:watch(sttText)', message: 'sttText changed', data: { len: v.length, preview: v.slice(0, 30) }, timestamp: Date.now() }) }).catch(() => {})
-  // #endregion
 })
 
 const voiceTrace = getVoiceTraceBusContext()

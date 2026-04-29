@@ -1,8 +1,8 @@
 import { useLocalStorageManualReset } from '@proj-airi/stage-shared/composables'
 import { defineStore } from 'pinia'
-import { onMounted, watch } from 'vue'
+import { ref, watch } from 'vue'
 
-import { useAudioDevice } from '../audio'
+import { useAudioDevice } from '../../composables/audio'
 
 export const useSettingsAudioDevice = defineStore('settings-audio-devices', () => {
   const { audioInputs, deviceConstraints, selectedAudioInput: selectedAudioInputNonPersist, startStream, stopStream, stream, askPermission } = useAudioDevice()
@@ -21,9 +21,30 @@ export const useSettingsAudioDevice = defineStore('settings-audio-devices', () =
     else {
       stopStream()
     }
-  })
+  }, { immediate: true })
 
-  onMounted(() => {
+  const requestedPermissionOnce = ref(false)
+  watch([selectedAudioInputEnabledPersist, audioInputs, selectedAudioInputPersist], ([enabled, inputs, selected]) => {
+    if (!enabled)
+      return
+
+    if (inputs.length === 0) {
+      if (!requestedPermissionOnce.value) {
+        requestedPermissionOnce.value = true
+        askPermission()
+      }
+      return
+    }
+
+    const hasSelectedInList = !!selected && inputs.some(device => device.deviceId === selected)
+    if (!hasSelectedInList) {
+      selectedAudioInputPersist.value = inputs.find(device => device.deviceId === 'default')?.deviceId ?? inputs[0].deviceId
+    }
+
+    startStream()
+  }, { immediate: true })
+
+  function initialize() {
     const hasSelectedInput = selectedAudioInputPersist.value
       && audioInputs.value.some(device => device.deviceId === selectedAudioInputPersist.value)
 
@@ -33,12 +54,13 @@ export const useSettingsAudioDevice = defineStore('settings-audio-devices', () =
     if (selectedAudioInputNonPersist.value && !selectedAudioInputEnabledPersist.value) {
       selectedAudioInputPersist.value = selectedAudioInputNonPersist.value
     }
-  })
+  }
 
   function resetState() {
     selectedAudioInputPersist.reset()
     selectedAudioInputNonPersist.value = ''
     selectedAudioInputEnabledPersist.reset()
+    requestedPermissionOnce.value = false
     stopStream()
   }
 
@@ -49,6 +71,8 @@ export const useSettingsAudioDevice = defineStore('settings-audio-devices', () =
     enabled: selectedAudioInputEnabledPersist,
 
     stream,
+
+    initialize,
 
     askPermission,
     startStream,

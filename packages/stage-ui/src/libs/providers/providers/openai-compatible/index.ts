@@ -1,7 +1,8 @@
 import { createOpenAI } from '@xsai-ext/providers/create'
 import { z } from 'zod'
 
-import { createOpenAICompatibleValidators } from '../../validators/openai-compatible'
+import { ProviderValidationCheck } from '../../types'
+import { createOpenAICompatibleValidators } from '../../validators'
 import { defineProvider } from '../registry'
 
 const openAICompatibleConfigSchema = z.object({
@@ -18,7 +19,7 @@ type OpenAICompatibleConfig = z.input<typeof openAICompatibleConfigSchema>
 
 export const providerOpenAICompatible = defineProvider<OpenAICompatibleConfig>({
   id: 'openai-compatible',
-  order: 3,
+  order: 4,
   name: 'OpenAI Compatible',
   nameLocalize: ({ t }) => t('settings.pages.providers.provider.openai-compatible.title'),
   description: 'OpenAI-compatible chat APIs with API key authentication.',
@@ -48,7 +49,7 @@ export const providerOpenAICompatible = defineProvider<OpenAICompatibleConfig>({
   },
   validators: {
     ...createOpenAICompatibleValidators({
-      checks: ['connectivity', 'model_list', 'chat_completions'],
+      checks: [ProviderValidationCheck.Connectivity, ProviderValidationCheck.ModelList, ProviderValidationCheck.ChatCompletions],
     }),
   },
 })

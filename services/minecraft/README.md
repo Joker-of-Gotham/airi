@@ -1,123 +1,241 @@
-# ⛏️ Minecraft agent player for [アイリ (AIRI)](https://airi.moeru.ai)
+# AIRI Minecraft Service
 
-> [!NOTE]
->
-> This project is part of the [Project アイリ (AIRI)](https://github.com/moeru-ai/airi), we aim to build a LLM-driven VTuber like [Neuro-sama](https://www.youtube.com/@Neurosama) (subscribe if you didn't!) if you are interested in, please do give it a try on [live demo](https://airi.moeru.ai).
+This workspace runs AIRI's dedicated Minecraft bot. It connects a Mineflayer runtime to a Minecraft server, loads the cognitive stack in `src/cognitive`, and bridges status, context, and command traffic back to AIRI so the Stage settings shell can observe the service.
 
-An intelligent Minecraft bot powered by LLM. AIRI can understand natural language commands, interact with the world, and assist players in various tasks.
+## Deprecation Notice
 
-## 🎥 Preview
+This service is on a deprecation path. The current Mineflayer-based bot is expected to be replaced by a Fabric mod based runtime, which will become the primary Minecraft integration surface going forward.
 
-![demo](./docs/preview.avif)
+Use this service for current local development and maintenance, but avoid building new long-term features around the Mineflayer runtime unless they are also part of the migration plan.
 
-## ✨ Features
+## Safety Notice
 
-- 🗣️ Natural language understanding
-- 🏃‍♂️ Advanced pathfinding and navigation
-- 🛠️ Block breaking and placing
-- 🎯 Combat and PvP capabilities
-- 🔄 Auto-reconnect on disconnection
-- 📦 Inventory management
-- 🤝 Player following and interaction
-- 🌍 World exploration and mapping
+Do not connect this bot to public servers you do not trust.
 
-## 🚀 Getting Started
+The runtime can execute JavaScript-generated action plans to control the bot. Those scripts run in an isolated environment, but they still drive a real local process with access to your Minecraft session, local network reachability, and other machine-side resources. A malicious or hostile server can still cause unwanted actions, or damage to your system.
 
-### 📋 Prerequisites
+Treat this service as a local-development and trusted-server tool only.
 
-- 📦 Node.js 23+
-- 🔧 pnpm
-- 🎮 A Minecraft server (1.20+)
+## Setup
 
-### 🔨 Installation
+1. Install workspace dependencies from the repo root:
 
-1. Clone the repository:
+   ```bash
+   pnpm i
+   ```
 
-```bash
-git clone https://github.com/moeru-ai/airi.git
-cd services/minecraft
+2. Copy the template:
+
+   ```bash
+   cp services/minecraft/.env services/minecraft/.env.local
+   ```
+
+3. Edit `services/minecraft/.env.local`.
+
+4. Start the service:
+
+   ```bash
+   pnpm -F @proj-airi/minecraft-bot dev
+   ```
+
+   Or, from `services/minecraft/`:
+
+   ```bash
+   pnpm dev
+   ```
+
+5. The bot should automatically connect to both AIRI and the Minecraft server.
+
+## Cognitive Architecture
+
+AIRI's Minecraft agent is built on a **four-layered cognitive architecture** inspired by cognitive science, enabling reactive, conscious, and physically grounded behaviors.
+
+### Architecture Overview
+
+```mermaid
+graph TB
+    subgraph "Layer A: Perception"
+        Events[Raw Events]
+        EM[Event Manager]
+        Events --> EM
+    end
+
+    subgraph "Layer B: Reflex (Subconscious)"
+        RM[Reflex Manager]
+        FSM[State Machine]
+        RM --> FSM
+    end
+
+    subgraph "Layer C: Conscious (Reasoning)"
+        ORC[Orchestrator]
+        Planner[Planning Agent (LLM)]
+        Chat[Chat Agent (LLM)]
+        ORC --> Planner
+        ORC --> Chat
+    end
+
+    subgraph "Layer D: Action (Execution)"
+        TE[Task Executor]
+        AA[Action Agent]
+        Planner -->|Plan| TE
+        TE -->|Action Steps| AA
+    end
+
+    EM -->|High Priority| RM
+    EM -->|All Events| ORC
+    RM -.->|Inhibition Signal| ORC
+    ORC -->|Execution Request| TE
+
+    style EM fill:#e1f5ff
+    style RM fill:#fff4e1
+    style ORC fill:#ffe1f5
+    style TE fill:#dcedc8
 ```
 
-2. Install dependencies:
+### Layer A: Perception
 
-```bash
-pnpm install
+**Location**: `src/cognitive/perception/`
+
+The perception layer acts as the sensory input hub, collecting raw Mineflayer signals and translating them into typed events/signals through an event registry + rule engine pipeline.
+
+**Pipeline**:
+- Event definitions in `events/definitions/*` bind Mineflayer events to normalized raw events.
+- `EventRegistry` emits `raw:<modality>:<kind>` events to the cognitive event bus.
+- `RuleEngine` evaluates YAML rules and emits derived `signal:*` events consumed by Reflex/Conscious layers.
+
+**Key files**:
+- `events/index.ts`
+- `events/definitions/*`
+- `rules/engine.ts`
+- `rules/*.yaml`
+- `pipeline.ts`
+
+### Layer B: Reflex
+
+**Location**: `src/cognitive/reflex/`
+
+The reflex layer handles immediate, instinctive reactions. It operates on a finite state machine (FSM) pattern for predictable, fast responses.
+
+**Components**:
+- **Reflex Manager** (`reflex-manager.ts`): Coordinates reflex behaviors
+- **Inhibition**: Reflexes can inhibit Conscious layer processing to prevent redundant responses.
+
+### Layer C: Conscious
+
+**Location**: `src/cognitive/conscious/`
+
+The conscious layer handles complex reasoning, planning, and high-level decision-making. No physical execution happens here anymore.
+
+**Components**:
+- **Brain** (`brain.ts`): Event queue orchestration, LLM turn lifecycle, safety/budget guards, debug REPL integration.
+- **JavaScript Planner** (`js-planner.ts`): Sandboxed planning/runtime execution against exposed tools/globals.
+- **Query Runtime** (`query-dsl.ts`): Read-only world/inventory/entity query helpers for planner scripts.
+- **Task State** (`task-state.ts`): Cancellation token and task lifecycle primitives used by action execution.
+
+### Layer D: Action
+
+**Location**: `src/cognitive/action/`
+
+The action layer is responsible for the actual execution of tasks in the world. It isolates "Doing" from "Thinking".
+
+**Components**:
+- **Task Executor** (`task-executor.ts`): Runs normalized action instructions and emits action lifecycle events.
+- **Action Registry** (`action-registry.ts`): Validates params and dispatches tool calls.
+- **Tool Catalog** (`llm-actions.ts`): Action/tool definitions and schemas bound to mineflayer skills.
+
+### Event Flow Example
+
+**Scenario: "Build a house"**
+```txt
+Player: "build a house"
+  ↓
+[Perception] Event detected
+  ↓
+[Conscious] Architect plans the structure
+  ↓
+[Action] Executor takes the plan and manages the construction loop:
+    - Step 1: Collect wood (calls ActionRegistry tool)
+    - Step 2: Craft planks
+    - Step 3: Build walls
+  ↓
+[Conscious] Brain confirms completion: "House is ready!"
 ```
-
-3. Create a `.env.local` file with your configuration:
-
-> [!NOTE]
-> For all online accounts, un-comment the following line to toggle Microsoft authentication.
-> Link for authentication will popup when the bot starts.
->
-> After signed in, according to [how Minecraft protocol was implemented](https://github.com/PrismarineJS/node-minecraft-protocol/blob/bf89f7e86526c54d8c43f555d8f6dfa4948fd2d9/src/client/microsoftAuth.js#L7-L16)
-> and also, [authentication flow implemented here](https://github.com/PrismarineJS/prismarine-auth/blob/1aef6e1387d94fca839f2811d17ac6659ae556b4/src/MicrosoftAuthFlow.js#L59-L69),
-> the token will be cached with [the cache IDs specified here](https://github.com/PrismarineJS/prismarine-auth/blob/1aef6e1387d94fca839f2811d17ac6659ae556b4/src/MicrosoftAuthFlow.js#L88-L93)
-> in split files:
->
-> - `${hash}_live-cache.json`
-> - `${hash}_mca-cache.json`
-> - `${hash}_xbl-cache.json`
->
-> inside of the directory provided by [`minecraft-folder-path`](https://github.com/simonmeusel/minecraft-folder-path)
->
-> Linux: `~/.minecraft/nmp-cache/`
-> macOS: `~/Library/Application Support/minecraft/nmp-cache/`
-> Windows: `%appdata%/.minecraft/nmp-cache/`
->
-> where `${hash}` is the `sha1` hash of the username you signing in with (as Minecraft username).
-
-```env
-OPENAI_API_KEY=your_openai_api_key
-OPENAI_API_BASEURL=your_openai_api_baseurl
-
-BOT_USERNAME=your_bot_username
-BOT_HOSTNAME=localhost
-BOT_PORT=25565
-BOT_AUTH='microsoft' # comment if you use offline mode
-BOT_VERSION=1.20
-```
-
-1. Start the bot:
-
-```bash
-pnpm dev
-```
-
-## 🎮 Usage
-
-Once the bot is connected, you can interact with it using chat commands in Minecraft. All commands start with `#`.
-
-### Basic Commands
-
-- `#help` - Show available commands
-- `#follow` - Make the bot follow you
-- `#stop` - Stop the current action
-- `#come` - Make the bot come to your location
-
-### Natural Language Commands
-
-You can also give the bot natural language commands, and it will try to understand and execute them. For example:
-
-- "Build a house"
-- "Find some diamonds"
-- "Help me fight these zombies"
-- "Collect wood from nearby trees"
-
-## 🛠️ Development
 
 ### Project Structure
 
-```
+```txt
 src/
-├── agents/     # AI agent implementations
-├── composables/# Reusable composable functions
-├── libs/       # Core library code
-├── mineflayer/ # Mineflayer plugin implementations
-├── prompts/    # AI prompt templates
-├── skills/     # Bot skills and actions
-└── utils/      # Utility functions
+├── airi/                      # AIRI bridge, module shell, status publishing
+├── cognitive/                  # 🧠 Perception → Reflex → Conscious → Action
+│   ├── perception/            # Event definitions + rule evaluation
+│   │   ├── events/
+│   │   │   ├── index.ts
+│   │   │   └── definitions/*
+│   │   ├── rules/
+│   │   │   ├── *.yaml
+│   │   │   ├── engine.ts
+│   │   │   ├── loader.ts
+│   │   │   └── matcher.ts
+│   │   └── pipeline.ts
+│   ├── reflex/                # Fast, rule-based reactions
+│   │   ├── reflex-manager.ts
+│   │   ├── runtime.ts
+│   │   ├── context.ts
+│   │   └── behaviors/idle-gaze.ts
+│   ├── conscious/             # LLM-powered reasoning
+│   │   ├── brain.ts           # Core reasoning loop/orchestration
+│   │   ├── js-planner.ts      # JS planning sandbox
+│   │   ├── query-dsl.ts       # Read-only query runtime
+│   │   ├── llm-log.ts         # Turn/log query helpers
+│   │   ├── task-state.ts      # Task lifecycle enums/helpers
+│   │   └── prompts/           # Prompt definitions (e.g., brain-prompt.ts)
+│   ├── action/                # Task execution layer
+│   │   ├── task-executor.ts   # Executes actions and emits lifecycle events
+│   │   ├── action-registry.ts # Tool dispatch + schema validation
+│   │   ├── llm-actions.ts     # Tool catalog
+│   │   └── types.ts
+│   ├── event-bus.ts           # Event bus core
+│   ├── container.ts           # Dependency injection wiring
+│   ├── index.ts               # Cognitive system entrypoint
+│   └── types.ts               # Shared cognitive types
+├── composables/
+│   ├── config.ts              # Environment schema + defaults
+│   ├── runtime-config.ts      # Persisted local runtime config
+│   └── bot.ts
+├── debug/                     # Debug dashboard, MCP REPL, viewer integration
+├── libs/
+│   └── mineflayer/           # Mineflayer bot wrapper/adapters
+├── skills/                   # Atomic bot capabilities
+├── plugins/                  # Mineflayer/bot plugins
+├── utils/                    # Helpers
+├── minecraft-bot-runtime.ts  # Bot lifecycle wrapper for reconnect/reconfigure
+└── main.ts                   # Bot entrypoint
 ```
+
+### Design Principles
+
+1. **Separation of Concerns**: Each layer has a distinct responsibility
+2. **Event-Driven**: Loose coupling via centralized event system
+3. **Inhibition Control**: Reflexes prevent unnecessary LLM calls
+4. **Extensibility**: Easy to add new reflexes or conscious behaviors
+5. **Cognitive Realism**: Mimics human-like perception → reaction → deliberation
+
+### Future Enhancements
+
+- **Perception Layer**:
+  - ⏱️ Temporal context window (remember recent events)
+  - 🎯 Salience detection (filter noise, prioritize important events)
+
+- **Reflex Layer**:
+  - 🏃 Dodge hostile mobs
+  - 🛡️ Emergency combat responses
+
+- **Conscious Layer**:
+  - 💭 Emotional state management
+  - 🧠 Long-term memory integration
+  - 🎭 Personality-driven responses
+
+## 🛠️ Development
 
 ### Commands
 

@@ -18,29 +18,91 @@ dialogs:
     baseUrl: 基礎 URL
     baseUrlHelp: API 端點 URL（如果不確定請使用預設值）
     accountId: 帳號 ID
+    validationRunning: Running tests
     validationSuccess: 設定驗證成功
+    validationPartial: Configuration partially validated
     validationFailed: 設定驗證失敗
     validationError: '驗證錯誤：{error}'
+    testGeneration: Ping API
+    testGenerationRunning: Ping...
+    testGenerationFailed: Ping test failed
+    retryPingCheck: Retry
     skipForNow: 先略過
     saveAndContinue: 儲存並繼續
     next: 下一步
     retry: 重試
+    credentialsSafeLabel: Keep your API keys and credentials safe!
+    credentialsSafeLocal: >-
+      AIRI is running pure locally in your PC, and we will never steal your credentials for AI / LLM providers. But keep in mind that your API keys are sensitive information. Make sure to keep them safe and do not share them with anyone.
+    credentialsSafeOpenSource: >-
+      AIRI is open sourced at {github}, if you want to check how we handle your credentials, feel free to inspect our code.
+    enableChatCheck: >-
+      Allow airi to send a "ping" message to the first available chat model to check availability
     start: 開始吧！
+    loginPrompt: Sign in to use the official AIRI provider for the best experience.
+    loginAction: Sign in
+    setupWithoutSigningIn: Setup with your provider
+    flux: Flux
+    buyFlux: Charge Flux
     select-model: 選擇模型
     no-models: 找不到可用的模型
     no-models-help: >-
       請返回上一步並檢查您的 API Key，或檢查網路連線。
+    permissions:
+      title: Notifications
+      description: You can allow notifications now or continue and set it up later.
+      notificationsTitle: Notifications
+      notificationsDescription: Allow reminders and important status updates.
+      notificationsAction: Request notification permission
+      notificationsNotGrantedHint: If denied, you can enable notifications later from iOS Settings.
+      openSettings: Open iOS Settings
+      optionalHint: You can continue even if notification permission is not granted.
+      stateUnknown: Not requested
+      stateRequesting: Requesting...
+      stateGranted: Granted
+      stateNotGranted: Not granted
+  bug-report:
+    title: Bug report (´;ω;`)ヾ(･∀･`)
+    subtitle: Oops, sorry we made something wrong. Would you mind telling us what happened?
+    trigger-label: Report a Bug
+    submit-label: Send Bug Report
+    triage-description: Include screenshot and page context to help us triage this issue.
+    description-placeholder: Steps to reproduce, expected behavior, and actual behavior
+    include-current-page-screenshot: Include current page screenshot
+    manual-media:
+      label: Manually choose screenshots / recordings
+      optional: Optional.
+    media-files:
+      label: Media files
+      description: 'Optional: manually select.'
+      placeholder: Choose screenshot or video file
+      selected-count: '{count} file(s) selected'
+    last-submitted-preview: Last Submitted Payload Preview
 language:
   title: 語言
-  description: >
-    切換顯示介面的語言
+  description: |
+    UI language. You can set characters' language later.
 controls-island:
   icon-size:
     title: 控制島嶼圖示大小
     description: 調整控制島圖示的大小
     auto: 自動（回應式）
-    large: Large (default)
-    small: Small
+    large: 大(默認)
+    small: 小
+analytics:
+  notice:
+    title: Usage analytics
+    description: >-
+      AIRI collects anonymous usage analytics to help us understand how the app is used and improve stability. No personal data is collected.
+    privacyPrefix: Read the
+    privacyLink: privacy policy
+    onboardingHint: You can turn analytics off later in Settings > System > General.
+    settingsHint: You can turn analytics off at any time.
+  toggle:
+    title: Enable usage analytics
+    description: Turn this off to opt out of analytics collection.
+  disabled:
+    title: Analytics disabled for this development build
 live2d:
   change-model:
     from-file: 從檔案載入
@@ -64,25 +126,43 @@ live2d:
     title: 想切換至 3D 虛擬角色嗎？
     change-to-vrm: 切換至 3D 虛擬角色設定頁面（VRM）
   theme-color-from-model:
-    title: Extract colors from model
+    title: 從模型中提取顏色
     button-extract:
       title: 提取
   focus:
     title: 停用模型滑鼠追蹤
     button-disable:
-      title: 停用
+      title: Disable model mouse tracking
+  render-scale:
+    title: Render scale
+  fps:
+    title: FPS
+    description: 限制渲染幀率
+    options:
+      unlimited: '∞'
 microphone: 麥克風
 models: 模型
 pages:
+  account:
+    title: Account
+    description: View your profile and manage your account
+    notLoggedIn: Sign in to view your account and access all features
+    login: Sign in
+    logout: Sign out
+    fluxBalance: Flux Balance
+    viewFluxDetails: View details
+    signedInAs: Signed in as
   card:
     activate: 啟用
     active: 已啟用
     active_badge: 目前使用中
-    cancel: Cancel action
-    save: Save changes
+    cancel: 取消操作
+    save: 儲存變更
     card_not_found: 找不到角色卡
     character: 角色設定
     close: 關閉
+    chat:
+      provider: 聊天 / 供應商
     consciousness:
       model: 意識 / 模型
     created_by: 建立者
@@ -94,7 +174,7 @@ pages:
     description_label: 描述
     drop_here: 放開以上傳檔案
     create_card: 建立新角色卡
-    edit_card: Edit Card
+    edit_card: 編輯卡片
     creation:
       identity: 身分
       name: 名字
@@ -111,6 +191,10 @@ pages:
         scenario: 你最近醒來，忘記了之前的所有生活。
         systemprompt: 你將會收到訊息，請像真實人類一樣回覆。
         posthistoryinstructions: 記得模仿人類的行為。
+      modules_info: >-
+        為這個角色卡設定模組。如果沒有設定，將會使用預設模組。
+      use_default: 使用預設
+      use_default_not_configured: 使用預設(尚未設定)
       fields_info:
         subtitle: >-
           您可以在這裡填寫有關您正在建立的角色的一些詳細資訊，解釋他的背景與情境，以及應該如何回應您的互動。
@@ -127,6 +211,8 @@ pages:
         posthistoryinstructions: 在訊息歷史之後，放入 AI LLM 應該閱讀的內容。
         version: >-
           卡片版本，如果您從先前的卡片做了更改，應當增加此版本號。
+        consciousness_model: 請為該角色選擇意識模型（人工智能模型）。
+        speech_model: 請為此角色選用語音合成模型與聲線。
       errors:
         name: 錯誤：你必須提供一個有效的名稱！
         version: '錯誤：版本號無效！'
@@ -135,6 +221,7 @@ pages:
         scenario: '錯誤：必須提供一個情境。'
         systemprompt: '錯誤：請提供系統提示。'
         posthistoryinstructions: '錯誤：必須提供訊息歷史後的提示。'
+        invalid_artistry_json: 'Error: Artistry provider options contains invalid JSON.'
     modules: 模組
     name_asc: 名稱 (A-Z)
     name_desc: 名稱 (Z-A)
@@ -146,7 +233,9 @@ pages:
     scenario: 情境
     search: 搜尋角色卡...
     sort_by: 排序方式
+    body-model: Body / Display Model
     speech:
+      provider: 聲音 / 聲線
       model: 聲音 / 模型
       voice: 聲音 / 聲線
     systemprompt: 系統提示詞
@@ -158,51 +247,55 @@ pages:
     description: 存放記憶的地方，以及策略
     title: 記憶體
   data:
-    title: Data
-    description: Manage stored AIRI data, exports, and resets
+    title: 資料
+    description: 管理已儲存的 AIRI 資料、匯出與重置作業
     sections:
       chats:
-        title: Chat sessions
-        description: Export or import saved chat sessions.
-        export: Export chats
-        import: Import chats
-        delete: Delete all chat sessions
+        title: 對話紀錄
+        description: 匯出或匯入已儲存的對話紀錄。
+        export: 匯出聊天記錄
+        import: 匯入聊天記錄
+        delete: 刪除所有聊天記錄
       models:
-        title: Models
-        description: Remove imported Live2D/VRM models.
-        delete: Delete all models
+        title: 模型
+        description: 移除匯入的 Live2D/VRM 模型
+        delete: 刪除所有模型
       modules:
-        title: Modules
-        description: Reset module preferences and credentials.
-        reset: Reset module settings
+        title: 模組
+        description: 重設模組偏好設定與驗證資訊
+        reset: 重設模組設定
       providers:
-        title: Providers
-        description: Reset all provider settings and credentials.
-        reset: Reset provider settings
+        title: 服務提供者
+        description: 重設所有服務提供者的設定與驗證資訊
+        reset: 重設服務提供者的設定
       danger:
-        title: Danger zone
-        description: Irreversible actions. Export what you need before continuing.
+        title: 危險區域
+        description: 此操作無法還原。繼續前請先匯出所需資料。
       all:
-        title: Delete all data
-        description: Wipe every local setting, provider config, and model.
-        delete: Delete all data
+        title: 刪除所有資料
+        description: 清除所有本機設定、服務提供者設定與模型。
+        delete: 刪除所有資料
+      desktop-folder:
+        title: Open app data folder
+        description: Open AIRI's data folder in your file manager.
+        open: Open folder
       desktop:
-        title: Reset desktop settings & states
-        description: Clear AIRI desktop settings and runtime state.
-        reset: Reset desktop data
+        title: 重設桌面設定與狀態
+        description: 清除 AIRI 桌面設定與執行階段狀態
+        reset: 重設桌面資料
     confirmations:
-      tooltip: Are you sure?
-      'yes': 'Yes'
+      tooltip: 您確定嗎？
+      'yes': '是'
     status:
-      exported: Chat sessions exported.
-      imported: Chat sessions imported.
-      import_error: Failed to import chat sessions. Please check the file format.
-      chats_deleted: Chat sessions deleted.
-      models_deleted: Models deleted.
-      modules_reset: Module settings reset.
-      providers_reset: Provider settings reset.
-      all_deleted: All local data deleted.
-      desktop_reset: Desktop data reset.
+      exported: 對話階段已匯出。
+      imported: 對話階段已匯入。
+      import_error: 匯入對話階段失敗，請檢查檔案格式。
+      chats_deleted: 對話階段已刪除。
+      models_deleted: 模型已刪除
+      modules_reset: 模組設定已重設
+      providers_reset: 服務提供者設定已重設
+      all_deleted: 所有本機資料已刪除
+      desktop_reset: 桌面資料已重設
   models:
     description: 切換角色的 Live2D、VRM 模型
     title: 角色模型
@@ -210,59 +303,120 @@ pages:
       section:
         live2d:
           title: Live2D
-          description: Configure Live2D models and settings
+          description: 設定 Live2D 模型與相關選項
         vrm:
           title: VRM
-          description: Configure 3D VRM models and settings
+          description: 設定 3D VRM 模型與相關選項
         scene: 場景
   modules:
     beat_sync:
-      description: Vibe with beats from the audio source
-      title: Beat Sync
+      description: 依據音訊來源的節奏同步互動
+      title: 節拍同步
       sections:
         audio_source:
           actions:
-            start_screen_capture: Start screen capture
-            stop: Stop
-          description: Select an audio source to detect beats from.
-          title: Audio source
+            start_screen_capture: 開始畫面擷取
+            stop: 停止
+          description: 請選取要偵測節拍的音訊來源
+          title: 音訊來源
         beat_visualizer:
-          title: Beat visualizer
+          title: 節拍視覺化工具
         parameters:
-          advanced_parameters: Advanced Parameters
-          description: Tweak the beat detection parameters.
-          title: Parameters
+          advanced_parameters: 進階參數
+          description: 調整節拍檢測參數。
+          title: 參數
           parameters:
             adaptive_threshold:
               description: >-
-                Whether to apply adaptive thresholds based on signal variance over time.
-              label: Adaptive threshold
+                是否根據訊號隨時間的變異性套用自適應閾值。
+              label: 自適應閾值
             buffer_duration:
-              description: Duration of the internal analysis buffer.
-              label: Buffer duration
+              description: 內部分析緩衝區的時長。
+              label: 緩衝時長
             envelope_filter_frequency:
               description: >-
-                Frequency for the envelope filter applied to smooth energy changes.
-              label: Envelope filter frequency
+                用於平滑能量變化的包絡濾波器頻率
+              label: 包絡濾波器頻率
             highpass_filter_frequency:
               description: >-
-                Frequency for the highpass filter applied to reduce low frequencies like sub-bass noises.
-              label: Highpass filter frequency
+                用於抑制次低音等低頻雜訊的高通濾波器頻率。
+              label: 高通濾波器頻率
             lowpass_filter_frequency:
               description: >-
-                Frequency for the lowpass filter applied to reduce high frequencies like vocals.
-              label: Lowpass filter frequency
+                低通濾波器的頻率是用來降低像人聲等高頻成分。
+              label: 低通濾波器
             min_beat_interval:
-              description: Maximum BPM or minimum interval between detected beats.
-              label: Max BPM / Min beat interval
+              description: 已偵測節拍之間的最大分鐘節拍數(BPM)或最小間隔。
+              label: 最大分鐘節拍數(BPM)/最小節拍間隔
             sensitivity:
-              label: Sensitivity
+              label: 靈敏度
             spectral_flux:
-              description: Whether to enable spectral flux-based onset detection.
-              label: Spectral flux
+              description: 是否啟用基於頻譜通量的起始點偵測。
+              label: 頻譜通量
             warmup:
-              description: Whether to warm up before detecting beats for better accuracy.
-              label: Warmup
+              description: 是否在偵測節拍前進行預熱以提高準確度。
+              label: 預熱
+    artistry:
+      title: Artistry
+      description: Image generation, scene background and drawing.
+      page:
+        title: Artistry Provider Configuration
+        description: Select the active backend provider for image generation. Characters can override this in their Card settings.
+      providers:
+        none:
+          name: None
+          description: Bypass and disable the image generation module globally.
+        comfyui:
+          name: ComfyUI (Local)
+          description: Use a local ComfyUI instance via WSL for image generation.
+        replicate:
+          name: Replicate.ai (Cloud)
+          description: Use cloud-based models via the Replicate API.
+        nanobanana:
+          name: Nano Banana (Preview)
+          description: Use Google AI Studio for image preview and reactions.
+      card:
+        description: Configure how AIRI generates images and visual content.
+        comfyui_empty: No ComfyUI workflows configured. Go to Settings → Providers → ComfyUI to upload a workflow template.
+        exposed_fields: '{count} exposed fields'
+        open_on_replicate: Open on Replicate
+        instruction_sync:
+          title: ComfyUI Instruction Sync
+          description: A specialized prompt is ready for your {workflowName} workflow. Applying this will overwrite current widget instructions so the AI knows how to use this specific template.
+          apply: Apply Recommended Prompt
+          keep: Keep Existing
+      provider: Artistry Provider
+      spawn_mode:
+        label: Manifestation Mode (Spawn Mode)
+        description: Choose how images are delivered to the interface.
+        options:
+          bg: Background Environment
+          inline: Inline Chat
+          widget: Overlay Widget
+          bg_widget: Dual (Background + Widget)
+      autonomous:
+        title: Cinematic Autonomy (Autonomous Artist)
+        description: When enabled, the "Producer" runs in parallel to the character to decide if a visual is needed. This prevents the character from forgetting to manifest scenes.
+        threshold: Manifestation Threshold
+        threshold_description: Use {min} for aggressive scene creation or {max} to require stronger evidence before generating.
+        threshold_min: Always Generate (0%)
+        threshold_max: Strict (100%)
+      model:
+        label: Artistry Model (Optional Override)
+        description: Model identifier if needed by provider
+      prompt-prefix:
+        label: Artistry Prompt Default Prefix
+        description: Pre-pended to every prompt sent to the image generator.
+      options:
+        label: Artistry Provider Options (JSON)
+      widget-instructions:
+        label: Widget System Prompt
+        description: Custom instructions for the AI on how to use the generation capabilities.
+    categories:
+      essential: Essential
+      messaging: Messaging
+      gaming: Gaming
+      artistry: Artistry
     consciousness:
       description: 人格設定、使用的模型等設定
       sections:
@@ -270,11 +424,12 @@ pages:
           provider-model-selection:
             collapse: 摺疊
             custom_model_placeholder: 輸入自訂模型名稱
+            current_model_label: '當前模型：'
             description: 為意識選擇合適的 LLM 服務來源
             error: 取得發生錯誤
-            health_check_failed: Health check failed
-            no_providers_configured_title: No Providers Configured
-            no_providers_configured_description: Click here to set up your LLM providers
+            health_check_failed: 健康度檢查失敗
+            no_providers_configured_title: 未設定任何供應商
+            no_providers_configured_description: 點此設定你的 LLM 提供者
             expand: 展開
             loading: 載入模型中...
             manual_model_name: 模型名稱
@@ -289,7 +444,7 @@ pages:
             search_results: 找到 {count} / {total} 個模型
             show_less: 顯示更少
             show_more: 顯示更多
-            subtitle: 選擇一個模型
+            subtitle: 從該提供者中選擇預設模型
             title: 模型
       title: 意識
     description: 思維、視覺、語音綜合、遊戲等
@@ -311,23 +466,49 @@ pages:
       description: 一起玩 Minecraft！
       title: 我的世界 Minecraft
       enable: 啟用我的世界集成
-      enable-description: 允許 AIRI 與我的世界遊戲互動
-      server-address: 伺服器地址
-      server-address-description: 我的世界伺服器的 IP 地址或主機名稱
-      server-address-placeholder: 輸入伺服器地址（例如：localhost 或 play.example.com）
-      server-port: 伺服器端口
-      server-port-description: 我的世界伺服器的端口號（預設 25565）
-      username: 使用者名稱
-      username-description: 您在我的世界伺服器中的使用者名稱
-      username-placeholder: 輸入您的我的世界使用者名稱
+      enable-description: >-
+        Include Minecraft self-knowledge in Stage chat turns and keep passive runtime visibility enabled.
       configured: 我的世界已正確設定！
+      read-only:
+        title: Read-only shell
+        description: >-
+          Stage currently exposes Minecraft as a passive shell. Runtime status and traffic are visible here, but service configuration stays in the Minecraft service files.
+      setup:
+        title: Setup
+        description: >-
+          You can find the instructions for setting up the bot in the following file
+      runtime:
+        title: Observed runtime
+        connection: Connection
+        latest-context: Latest bot context
+        waiting: Waiting for a fresh bot-originated context push.
+        unknown: Unknown
+      debug:
+        title: Minecraft traffic
+        empty: No Minecraft traffic observed yet.
+        source: 'Source: {source}'
+      status:
+        service-online: Service online
+        service-offline: Service offline
+        no-runtime-context: No bot context observed yet
+        last-context-seconds: 'Last bot context: {seconds}s ago'
+        last-context-stale: 'Last bot context: Stale'
     hearing:
       description: 語音辨識
       title: 聽覺
       sections:
         section:
           provider-selection:
-            description: Select the suitable speech recognition provider
+            description: 選擇合適的語音辨識提供者
+          confidence-threshold:
+            title: Confidence Threshold
+            description: >-
+              Filter out low-confidence transcriptions to reduce Whisper hallucinations. Values closer to 0 are more strict; drag to the leftmost to disable. Only effective for providers supporting Whisper API (e.g., OpenAI, Groq).
+            disabled: Disabled
+            verbose-json-note: >-
+              Note: If your provider does not support verbose_json responses, this setting will have no effect.
+            verbose-json-unsupported: >-
+              Your provider did not return verbose_json segments. Confidence filtering had no effect on the last transcription.
     memory-long-term:
       description: 長期記憶
       title: 長期記憶
@@ -352,6 +533,7 @@ pages:
               stop:
                 label: 停止
             select-voice:
+              loading: 載入模型中……
               required: 請選擇聲線
           provider-voice-selection:
             custom_model_placeholder: 輸入指定模型名稱...
@@ -361,16 +543,16 @@ pages:
             no_models_description: 該服務來源的模型清單沒有回傳任何資料
             no_voices: 沒有任何可用的聲線
             no_voices_description: 該服務來源的聲線清單沒有回傳任何資料
-            no_voices_hint: You can enter a custom voice name below.
-            pause: Pause
+            no_voices_hint: 您可以在下方輸入自訂語音名稱。
+            pause: 暫停
             play_sample: Play
             search_models_placeholder: 搜尋模型...
             search_models_results: 找到 {count} / {total} 個模型
             search_voices_placeholder: 搜尋聲線...
             search_voices_results: 找到 {count} / {total} 條聲線
-            unsupported_voice_warning_title: No supported voices
+            unsupported_voice_warning_title: 未支援的語音
             unsupported_voice_warning_content: >-
-              Try a different model or provider. We are working on supporting all the voice for this model as quickly as possible. If you need it urgently, please let us know on GitHub at https://github.com/moeru-ai/airi/issues.
+              嘗試使用不同的模型或提供者。我們正努力盡快支援此模型的所有語音；若你急需此功能，請在 GitHub 回報：https://github.com/moeru-ai/airi/issues。
             show_less: 顯示更少
             show_more: 顯示更多
             title: 選擇語音合成服務來源
@@ -406,77 +588,118 @@ pages:
     mcp-server:
       description: 連線與管理 MCP 伺服器及工具
       title: MCP 伺服器
+      config-path: 設定檔路徑
+      runtime-title: 執行狀態
+      actions:
+        open-config: 開啟 mcp.json
+        apply-and-restart: 儲存並重新啟動 stdio MCP
+      messages:
+        opened: 已於 {path} 開啟設定檔
+        restarted: >-
+          MCP 伺服器已重新啟動。已啟動：{started}，已失敗：{failed}，已略過：{skipped}
+  flux:
+    title: Flux
+    buy: Charge
+    currency: Currency
+    description: Current Flux
+    packagesError: Failed to load packages. Please try again later.
+    checkout:
+      success: Payment successful! Your Flux has been topped up.
+      canceled: Payment was canceled.
+      error: Something went wrong. Please try again later.
+    audit:
+      title: Transaction History
+      time: Time
+      type: Type
+      detail: Detail
+      amount: Amount
+      typeAddition: Top-up
+      typeConsumption: Usage
+      typeInitial: Initial Grant
+      loading: Loading history...
+      empty: No transaction records yet.
+      loadMore: Load More
+      delayHint: Usage records may be delayed by up to 1 minute
+      ttsRequests: requests
+    packages:
+      title: Flux Packages
+      buy: Charge
+      description: Flux packages to choose from.
   providers:
-    explained:
-      chat: 文字生成模型服務來源，例如 OpenRouter、OpenAI、Ollama
-      Speech: 語音（文字轉語音）模型服務來源，例如 ElevenLabs、Azure Speech
-      Transcription: >-
-        轉錄（語音轉文字）模型服務來源，例如 Whisper.cpp、OpenAI、Azure Speech
-    helpinfo:
-      title: 第一次使用？
-      description: >
-        AIRI 需要設定至少一個 {chat} 服務來源，才能正常思考與運作。你可以把它看作是 AIRI 系統中角色的大腦。
     catalog:
       edit:
-        config-id-not-found: Provider configuration not found.
-        definition-id-not-found: Provider definition not found.
+        config-id-not-found: 找不到提供者設定。
+        definition-id-not-found: 找不到提供者定義。
         actions:
-          more-options: More options
-          delete: Delete
+          more-options: 更多選項
+          delete: 刪除
         validation:
           failed:
-            title: Please check your provider settings, validation failed.
-            description: You can still save the current configuration if you want to proceed.
-            action: Save anyway
+            title: 請檢查您的提供者設定，驗證失敗。
+            description: >-
+              如果您想繼續，之後仍可儲存目前的設定。
+            action: 仍然儲存
         config:
           common:
             fields:
               field:
                 api-key:
-                  label: API Key
-                  description: API Key used to authorize requests to this provider
+                  label: API 金鑰
+                  description: 用於授權向此提供者發送請求的 API 金鑰
                   placeholder: sk-...
                 base-url:
-                  label: Base URL
+                  label: 基礎 URL
                   description: >-
-                    The base url used to connect to remote service. Often looks like http://localhost:11434/v1 or https://example.com/v1.
-                  placeholder: Base url...
+                    用於連接遠端服務的基礎 URL。通常看起來像 http://localhost:11434/v1 或 https://example.com/v1
+                  placeholder: 基礎 url...
                 headers:
-                  label: Custom HTTP Headers
-                  description: Add custom HTTP headers
+                  label: 自訂 HTTP 標頭
+                  description: 新增自訂 HTTP 標頭
                   key:
-                    placeholder: Key
+                    placeholder: 參數名稱
                   value:
-                    placeholder: Value
+                    placeholder: 值
+                thinking-mode:
+                  label: 思考模式
+                  description: >
+                    控制 Ollama 思考行為。GPT-OSS 僅支持 low/medium/high 等級。
+                  options:
+                    auto: 自動（提供者預設）
+                    disable: 停用
+                    enable: 啟用
+                    low: 低
+                    medium: 中
+                    high: 高
         validators:
           actions:
-            validate: Validate
-          empty: No validation steps available.
+            validate: 驗證
+          empty: 沒有可用的驗證步驟。
           openai-compatible:
             check-config:
-              title: Configuration
+              title: 設定
             check-connectivity:
-              title: Connectivity
+              title: 連線
             check-supports-model-listing:
-              title: List Models
+              title: 列出模型
             check-supports-chat-completion:
-              title: Chat Completion
+              title: 聊天補全
           status:
-            validating: Validating...
-            valid: Passed
-            invalid: Errored
-          title: Checks
+            validating: 驗證中...
+            valid: 已通過
+            invalid: 發生錯誤
+          title: 檢查
         providers:
           provider:
             ollama:
               troubleshooting:
                 validators:
                   openai-compatible-check-connectivity:
-                    label: Extra configuration needed for Ollama
+                    label: 需要為 Ollama 進行額外配置
                     content: >-
-                      Sorry to hear that Connectivity check failed for Ollama. Don't worry, for Ollama instances, extra configuration is needed for making it pass for Ollama. You need to set <code>OLLAMA_HOST</code> explicitly when start the Ollama application or Ollama CLI server, for detailed information, check <a href="https://airi.moeru.ai/docs/en/docs/manual/integrations/providers/chat/ollama">Ollama integration guide</a>.
+                      很抱歉，Ollama 連接檢查失敗。不要擔心，如果使用 Ollama，需要額外配置才能通過 Ollama。 您需要在啟動 Olama 應用程序或 Ollama CLI 伺服器時明確設置 <code>OLLAMA_HOST</code> 詳情，請檢查 <a href="https://airi.moeru.ai/docs/en/docs/manual/integrations/providers/chat/ollama">Ollama 集成指南</a>。
     common:
       continueAnyway: 仍然繼續
+      goToModelSelection: 選擇模型→
       fields:
         field:
           api-key:
@@ -498,6 +721,47 @@ pages:
           title: 基礎設定
         voice:
           title: 聲音設定
+    labels:
+      recommended: Recommended
+    filters:
+      pricing: Pricing
+      deployment: Deployment
+      all: All
+      free: Free
+      paid: Paid
+      internal: Internal
+      local: Local
+      cloud: Cloud
+    categories:
+      chat:
+        title: Chat
+        description: Text generation model providers. e.g. OpenRouter, OpenAI, Ollama.
+      speech:
+        title: Speech
+        description: Speech (text-to-speech) model providers. e.g. ElevenLabs, Azure Speech.
+      transcription:
+        title: Transcription
+        description: >-
+          Transcription (speech-to-text) model providers. e.g. Whisper.cpp, OpenAI, Azure Speech
+      artistry:
+        title: Artistry
+        description: Image generation and design model providers. e.g. ComfyUI, Replicate.
+        items:
+          comfyui:
+            description: Local image generation runner.
+          replicate:
+            description: Cloud-based model inference service.
+          nanobanana:
+            description: Google AI Studio Image Preview.
+    helpinfo:
+      title: 第一次使用？
+      description: >
+        AIRI 需要設定至少一個 {chat} 服務來源，才能正常思考與運作。你可以把它看作是 AIRI 系統中角色的大腦。
+    explained:
+      chat: 文字生成模型服務來源，例如 OpenRouter、OpenAI、Ollama
+      Speech: 語音（文字轉語音）模型服務來源，例如 ElevenLabs、Azure Speech
+      Transcription: >-
+        轉錄（語音轉文字）模型服務來源，例如 Whisper.cpp、OpenAI、Azure Speech
     description: LLM、語音合成、語音辨識服務來源等
     provider:
       app-local-audio-transcription:
@@ -515,6 +779,17 @@ pages:
       alibaba-cloud-model-studio:
         description: bailian.console.aliyun.com
         title: 阿里百煉
+      amazon-bedrock:
+        title: Amazon Bedrock
+        description: aws.amazon.com/bedrock
+        config:
+          api-key:
+            label: Bedrock API Key
+            description: Amazon Bedrock API key (generate in AWS Console → Bedrock → API Keys)
+            placeholder: bedrock-...
+          region:
+            label: AWS Region
+            description: AWS region where Bedrock is enabled (e.g. us-east-1, us-west-2)
       anthropic:
         description: anthropic.com
         title: Anthropic | Claude
@@ -559,6 +834,101 @@ pages:
       deepgram-tts:
         description: deepgram.com
         title: Deepgram
+      speech-noop:
+        title: 無
+        description: 無語音輸出。
+      comfyui:
+        settings:
+          title: ComfyUI (Local)
+          heading: ComfyUI Native API
+          description: Connect to your local ComfyUI and bring your own workflows.
+          info:
+            what_you_need:
+              label: What You Need
+              value: ComfyUI running locally or on your network.
+            how_to_export:
+              label: How To Export
+              value: Enable Dev Mode → "Save (API Format)".
+            scope_boundary:
+              label: Scope Boundary
+              value: Model downloads & node installs are your job.
+          connection:
+            title: Connection
+            connected: Connected
+            failed: Connection failed
+            error_prefix: Error
+            test: Test
+            testing: Testing...
+            unknown_error: Unknown connection error
+            unknown_gpu: Unknown GPU
+            server_url:
+              label: Server URL
+              description: The address where ComfyUI is running
+              placeholder: http://localhost:8188
+          cors:
+            title: CORS Block Detected
+            description: ComfyUI blocks requests from other applications by default. To allow AIRI to connect, you must start ComfyUI with the `--enable-cors-header "*"` flag.
+            command: python main.py --enable-cors-header "*"
+          workflows:
+            title: Workflow Templates
+            upload: Upload Workflow
+            cancel_upload: Cancel
+            empty: No workflows uploaded yet. Click "Upload Workflow" to import a workflow_api.json from ComfyUI.
+            exposed_parameters: Exposed Parameters
+            summary: '{nodes} nodes · {fields} exposed fields'
+            remove: Remove
+            config_snippet: Artistry Config Snippet
+            copy_json: Copy JSON
+            paste_hint: Paste this into your AIRI Card artistry config to override these nodes.
+          upload:
+            prompt: Drop or select a workflow_api.json file
+            invalid_json: Invalid JSON
+            workflow_name:
+              label: Workflow Name
+              description: Give this workflow a recognizable name
+              placeholder: e.g. Anime Text2Img
+            select_fields: 'Select fields to expose to the AI agent:'
+            fields_exposed: '{count} field(s) exposed'
+            save: Save Workflow
+      replicate:
+        settings:
+          title: Replicate.ai
+          heading: Replicate.ai Configuration
+          description: Configure your cloud image generation settings.
+          api_key:
+            label: API Key
+            description: Your Replicate API token (starts with r8_)
+            placeholder: r8_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+          default_model:
+            label: Default Model
+            description: Fallback owner/model string to use if the character card doesn't specify one
+            placeholder: black-forest-labs/flux-schnell
+          aspect_ratio:
+            label: Aspect Ratio
+            description: Default image aspect ratio (e.g. 16:9, 1:1, 9:16)
+            placeholder: '16:9'
+          inference_steps:
+            label: Inference Steps
+            description: Number of steps for the diffusion process (lower is faster, higher is better quality)
+      nanobanana:
+        settings:
+          title: Nano Banana
+          heading: Nano Banana (Google AI Studio)
+          description: Configure Google Gemini's native image generation capabilities.
+          api_key:
+            label: API Key
+            description: Your Google AI Studio API Key
+            placeholder: AIpk...
+          preferred_model:
+            label: Preferred Model
+            description: The specific Gemini image preview model to use
+          default_resolution:
+            label: Default Resolution
+            description: The target resolution for generated images
+          model_options:
+            nano_banana_2: Nano Banana 2 (Gemini 3.1 Flash Image)
+            nano_banana_pro: Nano Banana Pro (Gemini 3 Pro Image)
+            nano_banana: Nano Banana (Gemini 2.5 Flash Image)
       deepseek:
         description: DeepSeek.com
         title: 深度求索 DeepSeek
@@ -601,6 +971,31 @@ pages:
           validation:
             error-missing-api-key: 需要填寫 API Key 才能使用喔！
         title: ElevenLabs (11labs)
+      kokoro-local:
+        description: 基於 Kokoro-82M 的本地文字轉語音。
+        fields:
+          field:
+            model:
+              label: 模型選擇
+              description: 較小的模型載入速度更快，但品質可能略低。
+        models:
+          fp32-webgpu:
+            description: >-
+              使用 WebGPU 的全精度模型 - 建議在支援的裝置上使用
+          fp32:
+            description: 全精度模型
+          fp16:
+            description: 半精度
+          q8:
+            description: 8-bit 量化
+          q4:
+            description: 4-bit 量化
+          q4f16:
+            description: 4-bit 搭配 FP16
+        playground:
+          default-text: 您好！這是 Kokoro 文字轉語音系統的測試。
+          title: 語音測試場
+        title: Kokoro TTS (本地)
       fireworks:
         description: Fireworks.ai
         title: Fireworks.ai
@@ -615,9 +1010,20 @@ pages:
       index-tts-vllm:
         description: https://index-tts.github.io/
         title: Bilibili / IndexTTS
+        callout_indextts2_unavailable_title: 有限支援
+        callout_indextts2_unavailable: IndexTTS2 目前尚未支援，請改用 IndexTTS。
       azure-ai-foundry:
         description: Azure AI Foundry
         title: Azure AI Foundry
+      minimax:
+        description: minimaxi.com
+        title: MiniMax
+      minimax-global:
+        description: minimax.io
+        title: MiniMax Global
+      minimax-speech:
+        description: minimax.io
+        title: MiniMax Speech
       mistral:
         description: mistral.ai
         title: Mistral
@@ -636,14 +1042,23 @@ pages:
       openai:
         description: OpenAi.com
         title: OpenAI
+      azure-openai:
+        description: Azure OpenAI API
+        title: Azure OpenAI
       openai-compatible:
         description: OpenAI 相容
-        title: OpenAI Compatible
+        title: OpenAI 兼容性
+      nvidia:
+        description: build.nvidia.com
+        title: NVIDIA NIM
       n1n:
-        description: n1n.ai - High-performance AI API provider.
+        description: n1n.ai - 高效能AI API供應商
         title: n1n
       openrouter:
         description: OpenRouter.ai
+        title: OpenRouter
+      openrouter-audio-speech:
+        description: openrouter.ai
         title: OpenRouter
       perplexity:
         description: perplexity.ai
@@ -675,11 +1090,14 @@ pages:
           field:
             appId:
               description: 可在控制台取得的 App ID
-              label: App ID
+              label: 應用程式 ID
         title: 火山引擎
       xai:
         description: X.AI
         title: xAI
+      zai:
+        description: z.ai
+        title: Z.ai
       302-ai:
         description: 302.AI
         title: 302.AI
@@ -690,25 +1108,71 @@ pages:
         description: cerebras.ai
         title: Cerebras
       aliyun-nls:
-        description: Aliyun NLS
-        title: Aliyun NLS
+        description: 阿里雲 NLS
+        title: 阿里雲 NLS
       browser-web-speech-api:
-        description: Browser-native STT (requires Chrome/Edge/Safari)
-        title: Web Speech API
+        description: 瀏覽器原生 STT（需要 Chrome/Edge/Safari）
+        title: 網頁語音 API
+      official:
+        title: Official Provider
+        description: Official AI provider by AIRI.
+        speech-title: Official Speech Provider
+        speech-description: Official text-to-speech provider by AIRI.
+        transcription-title: Official Transcription Provider
+        transcription-description: Official speech-to-text provider by AIRI.
       transcriptions:
         playground:
           title: 實驗平台
+      aihubmix:
+        title: AIHubMix
+        description: https://aihubmix.com (10% 優惠)
     title: 服務來源
   connection:
-    description: Configure WebSocket server connection
-    title: Connection
+    description: 配置 WebSocket 伺服器連接
+    title: 連線
     websocket-url:
-      description: Full address of the WebSocket server (e.g., ws://localhost:6121/ws)
-      label: WebSocket Server Address
+      description: WebSocket 伺服器的完整位址（例如：ws://localhost:6121/ws）
+      label: WebSocket 伺服器位址
       placeholder: ws://localhost:6121/ws
-  scene:
-    description: 設定角色所在環境
-    title: 場景
+    server-hostname:
+      label: Expose On Network
+      description: >-
+        Choose whether the AIRI gateway only listens on this device or can be reached from your local network.
+      advanced-label: Bind Hostname
+      advanced-description: >-
+        Use a specific hostname or IP address when you need manual network binding.
+      options:
+        this-device: This device
+        all: All
+        advanced: Advanced
+    server-auth-token:
+      label: Auth Token
+      description: >-
+        Security token required by remote clients that connect to this gateway. When left empty, AIRI generates a new token automatically.
+      placeholder: Auto-generate
+    qr:
+      title: Connect from Stage Pocket
+      description: >-
+        Scan this QR code from Stage Pocket to try all reachable local network addresses and save the first working one.
+      refresh: Refresh
+      image-alt: AIRI server channel connection QR code
+      candidates: Candidate addresses
+      token-hint: >-
+        The QR code includes the auth token so Stage Pocket can authenticate after connecting. Do not share it publicly.
+      errors:
+        title: QR code unavailable
+        unavailable: Failed to prepare the connection QR code.
+    qr-scan:
+      title: Quick Connect
+      description: Scan the QR code from Tamagotchi to quick connect
+      instructions: Point the camera at the AIRI connection QR code.
+      action: Scan
+      success:
+        title: Connected address saved
+        description: 'URL been used: {url}'
+      errors:
+        title: QR scan failed
+        failed: Failed to scan or connect with the QR code.
   system:
     color-scheme:
       description: 更改舞台的配色方案
@@ -735,124 +1199,150 @@ pages:
           sections:
             section:
               performance-visualizer:
-                title: Performance Visualizer
-                description: Toggle FPS/long task/memory overlay
+                title: 效能檢視器
+                description: 切換 FPS/長時間任務/記憶疊加層
               markdown-stress:
-                title: Markdown Stress
-                description: Stress markdown parsing and rendering with heavy chat payloads
+                title: Markdown 壓力測試
+                description: 使用大量聊天內容進行 Markdown 解析與渲染的壓力測試
               use-magic-keys:
-                title: useMagicKeys
+                title: useMagicKeys 工具
                 description: 測試快捷鍵
               audio-record:
-                title: Audio Record
-                description: Test Audio related composables
+                title: 錄音
+                description: 測試音訊相關的組合式函式
               background-gradient-blending:
-                title: Background Theme color blending
-                description: Test blending & theme
+                title: 背景主題色彩混合
+                description: 測試混合效果與主題
               background-removal:
-                title: Background removal (WebGPU required)
-                description: Utility for background removal
+                title: 移除背景（需要 WebGPU）
+                description: 背景移除工具
               chat:
-                title: Chat
-                description: Chat
+                title: 聊天
+                description: 聊天
               gesture-circle:
-                title: Gesture Circle (Desktop only)
-                description: Test gesture recognition
+                title: 手勢圈選（僅限桌面）
+                description: 測試手勢辨識
               image:
-                title: Image
-                description: Image
+                title: 圖片
+                description: 圖片
               polaroid:
                 title: Polaroid
-                description: Utility for taking shots of models
+                description: 模型快照工具
               context-flow:
-                description: Inspect incoming context updates and outgoing chat stream events
+                description: >-
+                  檢查傳入的上下文更新與傳出的聊天串流事件
               websocket-inspector:
-                title: WebSocket Inspector
-                description: Inspect raw WebSocket traffic
+                title: WebSocket 檢查器
+                description: 檢查原始 WebSocket 流量
               vibrant:
-                title: Color extract
-                description: Test color extraction
+                title: 色彩擷取
+                description: 測試色彩擷取
               providers-transcription-realtime-aliyun-nls:
-                title: Aliyun Real-time Transcriber
-                description: Stream microphone audio to Aliyun NLS and inspect live transcripts
+                title: 阿里雲即時轉錄器
+                description: >-
+                  將麥克風音訊串流至阿里雲 NLS 並檢查即時轉錄文字
               performance-playground:
-                title: Performance Playground
-                description: 'Test performance runtime: VRM expressions + TTS lip sync'
+                title: 效能實驗場
+                description: VRM 表情 + TTS 嘴型同步實驗場
         theme-presets:
           presets:
             default:
               colors:
-                color-1: AIRI Green
-              description: The default greenish theme color, brought by AIRI to you!
-              title: Default Color
+                color-1: AIRI 綠
+              description: AIRI 為您帶來的預設綠色系主題色彩！
+              title: 預設色彩
             morandi:
               colors:
-                color-1: Taupe
-                color-2: Beige
-                color-3: Ash Grey
-                color-4: Light Taupe
-                color-5: Ivory
-                color-6: Olive Grey
-                color-7: Sand
-                color-8: Warm Grey
-              description: Soft, muted tones inspired by Giorgio Morandi's paintings
-              title: Morandi Colors
+                color-1: 灰褐色
+                color-2: 米色
+                color-3: 灰白色
+                color-4: 淺褐色
+                color-5: 象牙色
+                color-6: 橄欖灰
+                color-7: 砂色
+                color-8: 暖灰色
+              description: 受喬治·莫蘭迪畫作啟發的柔和低飽和色調
+              title: Morandi 顏色
             monet:
               colors:
-                color-1: Sky Blue
-                color-2: Mist
-                color-3: Sand
-                color-4: Moss Green
-                color-5: Water Lily
-                color-6: Wheat
-                color-7: Slate Blue
-                color-8: Sage
-              description: Impressionist palette inspired by Claude Monet's works
-              title: Monet Colors
+                color-1: 天藍色
+                color-2: 薄霧色
+                color-3: 砂色
+                color-4: 苔綠色
+                color-5: 睡蓮色
+                color-6: 小麥色
+                color-7: 板岩藍
+                color-8: 鼠尾草綠
+              description: 受克勞德·莫內作品啟發的印象派色調
+              title: 莫內(Monet) 色系
             japanese:
               colors:
-                color-1: Tan
-                color-2: Warm Taupe
-                color-3: Umber
-                color-4: Coffee
-                color-5: Bronze
-                color-6: Gold
-                color-7: Mustard
-                color-8: Amber
-              description: Traditional Japanese color palette
-              title: Japanese Colors
+                color-1: 棕褐色
+                color-2: 暖灰褐色
+                color-3: 深棕褐
+                color-4: 咖啡色
+                color-5: 古銅色
+                color-6: 金色
+                color-7: 芥末黃
+                color-8: 琥珀色
+              description: 傳統日本色彩調色盤
+              title: 日本顏色
             nordic:
               colors:
-                color-1: Nordic Blue
-                color-2: Ice
-                color-3: Fjord
-                color-4: Steel
-                color-5: Glacier
-                color-6: Slate
-                color-7: Cloud
-                color-8: Stone
-              description: Scandinavian minimalist color scheme
-              title: Nordic Colors
+                color-1: 北歐藍
+                color-2: 冰色
+                color-3: 峽灣色
+                color-4: 鋼灰
+                color-5: 冰川藍
+                color-6: 石板灰
+                color-7: 雲霧灰
+                color-8: 石頭色
+              description: 北歐極簡主義配色方案
+              title: 北歐顏色
             chinese:
               colors:
-                color-1: Rosy Dawn
-                color-2: Chinese Red
-                color-3: Smoky Brown
-                color-4: Bamboo Green
-                color-5: Dark Purple
-                color-6: Golden Yellow
-                color-7: Azure Blue
-                color-8: Ochre
+                color-1: 霞光紅
+                color-2: 棗紅
+                color-3: 黃櫨
+                color-4: 竹青
+                color-5: 烏梅紫
+                color-6: 緗色
+                color-7: 青冥
+                color-8: 赭石色
               description: >-
-                Traditional Chinese colors, derived from ancient textiles, porcelain and paintings
-              title: Chinese Traditional Colors
+                源自古代紡織品、瓷器和畫作的傳統中國色彩
+              title: 中國傳統色彩
           title: 預設
     title: 外觀
   page:
     developers:
       open-devtools:
-        title: Open Developer Tools
-        button: Open
+        title: 開放開發者工具
+        button: 開放
+  credits:
+    buy: Buy
+  scene:
+    title: Scenes
+    description: Customize the virtual environment for your characters.
+    beta_label: Scenes System
+    beta_description: Each character card specifies its own preferred background from this gallery. Setting it here will set it as the default for the currently active character.
+    background_image:
+      title: Active Character Background
+      no_background: No background active for this character. Upload a square or landscape image for best results.
+      upload: Upload to Gallery
+      change: Change Background
+      clear: Clear Default
+    gallery:
+      title: Scene Gallery
+      empty: No images in gallery yet. Upload one above!
+      set_as_global: Set as Character Default
+      delete: Delete from Gallery
+      global_badge: Character Default
+      active_badge: Current Scene
+      delete_confirm: Are you sure you want to delete this background?
+    tip:
+      label: Tip!
+      description: Using a square image will leverage <b>cover</b> cropping in portrait mode, focusing on the center of the scene.
 sections:
   section:
     general:
@@ -864,6 +1354,8 @@ theme:
 title: 設定
 voices: 聲線
 vrm:
+  render-scale:
+    title: Render scale
   change-model:
     from-file: 從檔案載入
     from-file-select: 選擇
@@ -903,7 +1395,11 @@ vrm:
   skybox:
     skybox-intensity: 天空盒光照強度
     skybox-specular-mix: 漫反射／鏡面反射混合係數
-wip:
-  title: Work in Progress
+websocket-secure-enabled:
+  title: 啟用安全 WebSocket (WSS)
   description: >-
-    This feature is currently under development and not yet publicly available. Check back in future updates for this functionality.
+    啟用 WSS（WebSocket Secure）以允許開發模式下行動裝置（pocket）的 HTTPS 連線。這將自動產生自簽名憑證。
+wip:
+  title: 正在開發中
+  description: >-
+    此功能正在開發中，尚未公開發佈。請在未來的更新中再次查看此功能。

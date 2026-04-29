@@ -83,16 +83,6 @@ export function useAudioDevice(requestPermission: boolean = false) {
   // Keep code compatible with the monorepo's pinned version.
   const { stream, stop: stopStream, start: startStream } = useUserMedia({ constraints: deviceConstraints, enabled: false, autoSwitch: true })
 
-  // #region agent log
-  watch([selectedAudioInput, () => String((deviceConstraints.value as any)?.audio?.deviceId?.exact ?? '')], ([id, exact]) => {
-    fetch('http://127.0.0.1:7242/ingest/783cccc2-5b30-488c-830d-4d552308c88b', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: 'debug-session', runId: 'run2', hypothesisId: 'E', location: 'packages/stage-ui/src/stores/audio.ts:useAudioDevice', message: 'audio device selection/constraints', data: { selectedAudioInput: id, exact }, timestamp: Date.now() }) }).catch(() => {})
-  }, { immediate: true })
-
-  watch(stream, (s) => {
-    fetch('http://127.0.0.1:7242/ingest/783cccc2-5b30-488c-830d-4d552308c88b', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: 'debug-session', runId: 'run2', hypothesisId: 'E', location: 'packages/stage-ui/src/stores/audio.ts:useAudioDevice', message: 'useUserMedia stream changed', data: { hasStream: !!s, tracks: s?.getTracks?.()?.length ?? 0 }, timestamp: Date.now() }) }).catch(() => {})
-  }, { immediate: true })
-  // #endregion
-
   watch(audioInputs, () => {
     if (!selectedAudioInput.value && audioInputs.value.length > 0) {
       selectedAudioInput.value = audioInputs.value.find(input => input.deviceId === 'default')?.deviceId || audioInputs.value[0].deviceId
@@ -124,7 +114,6 @@ export function useAudioDevice(requestPermission: boolean = false) {
     stopStream,
   }
 }
-
 export const useSpeakingStore = defineStore('character-speaking', () => {
   const nowSpeakingAvatarBorderOpacityMin = 30
   const nowSpeakingAvatarBorderOpacityMax = 100

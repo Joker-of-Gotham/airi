@@ -1,11 +1,13 @@
-import type * as fullSchema from '../schemas'
-import type { Database } from './db'
+import type { Database } from '../libs/db'
 
+import { useLogger } from '@guiiai/logg'
 import { and, eq, isNull, sql } from 'drizzle-orm'
 
 import * as schema from '../schemas/providers'
 
-export function createProviderService(db: Database<typeof fullSchema>) {
+const logger = useLogger('providers')
+
+export function createProviderService(db: Database) {
   return {
     async findAll(ownerId: string) {
       const userConfigs = db
@@ -93,6 +95,7 @@ export function createProviderService(db: Database<typeof fullSchema>) {
 
     async createUserConfig(data: schema.NewUserProviderConfig) {
       const [inserted] = await db.insert(schema.userProviderConfigs).values(data).returning()
+      logger.withFields({ id: inserted.id, ownerId: data.ownerId, definitionId: data.definitionId }).log('Created user provider config')
       return inserted
     },
 
@@ -104,17 +107,20 @@ export function createProviderService(db: Database<typeof fullSchema>) {
           isNull(schema.userProviderConfigs.deletedAt),
         ))
         .returning()
+      logger.withFields({ id }).log('Updated user provider config')
       return updated
     },
 
     async deleteUserConfig(id: string) {
-      return await db.update(schema.userProviderConfigs)
+      const result = await db.update(schema.userProviderConfigs)
         .set({ deletedAt: new Date() })
         .where(and(
           eq(schema.userProviderConfigs.id, id),
           isNull(schema.userProviderConfigs.deletedAt),
         ))
         .returning()
+      logger.withFields({ id }).log('Deleted user provider config')
+      return result
     },
 
     // System Provider Configs
@@ -135,6 +141,7 @@ export function createProviderService(db: Database<typeof fullSchema>) {
 
     async createSystemConfig(data: schema.NewSystemProviderConfig) {
       const [inserted] = await db.insert(schema.systemProviderConfigs).values(data).returning()
+      logger.withFields({ id: inserted.id, definitionId: data.definitionId }).log('Created system provider config')
       return inserted
     },
 
@@ -146,17 +153,41 @@ export function createProviderService(db: Database<typeof fullSchema>) {
           isNull(schema.systemProviderConfigs.deletedAt),
         ))
         .returning()
+      logger.withFields({ id }).log('Updated system provider config')
       return updated
     },
 
     async deleteSystemConfig(id: string) {
-      return await db.update(schema.systemProviderConfigs)
+      const result = await db.update(schema.systemProviderConfigs)
         .set({ deletedAt: new Date() })
         .where(and(
           eq(schema.systemProviderConfigs.id, id),
           isNull(schema.systemProviderConfigs.deletedAt),
         ))
         .returning()
+      logger.withFields({ id }).log('Deleted system provider config')
+      return result
+    },
+
+    /**
+     * Soft-delete every `user_provider_configs` row owned by the user.
+     * Called from the user-deletion pipeline. System configs are not
+     * touched (they are not user-scoped).
+     *
+     * Idempotent: `WHERE deletedAt IS NULL` skips already-stamped rows.
+     */
+    async deleteAllForUser(userId: string) {
+      const now = new Date()
+
+      const result = await db.update(schema.userProviderConfigs)
+        .set({ deletedAt: now, updatedAt: now })
+        .where(and(
+          eq(schema.userProviderConfigs.ownerId, userId),
+          isNull(schema.userProviderConfigs.deletedAt),
+        ))
+        .returning({ id: schema.userProviderConfigs.id })
+
+      logger.withFields({ userId, count: result.length }).log('Provider configs soft-deleted for user')
     },
   }
 }

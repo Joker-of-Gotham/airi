@@ -25,6 +25,8 @@ import { breakpointsTailwind, useBreakpoints, useBroadcastChannel, useMouse } fr
 import { storeToRefs } from 'pinia'
 import { computed, onMounted, onUnmounted, ref, useTemplateRef, watch } from 'vue'
 
+import WebSocketStatusButton from '../components/websocket-status-button.vue'
+
 const paused = ref(false)
 
 function handleSettingsOpen(open: boolean) {
@@ -209,16 +211,17 @@ watch([stream, () => vadLoaded.value], async ([s, loaded]) => {
     :background="selectedOption"
     :top-color="sampledColor"
   >
-    <div relative flex="~ col" z-2 h-100dvh w-100vw of-hidden>
+    <div flex="~ col" relative z-2 h-100dvh w-100vw of-hidden py-safe>
       <!-- header -->
       <div class="px-0 py-1 md:px-3 md:py-3" w-full gap-2>
         <Header class="hidden md:flex" />
         <MobileHeader class="flex md:hidden" />
       </div>
       <!-- page -->
-      <div relative flex="~ 1 row gap-y-0 gap-x-2 <md:col">
+      <div relative flex="~ 1 row gap-y-0 gap-x-2 <md:col" min-h-0>
         <WidgetStage
-          flex-1 min-w="1/2"
+          min-w="1/2"
+          min-h-0 flex-1
           :paused="paused"
           :focus-at="{
             x: positionCursor.x.value,
@@ -229,7 +232,11 @@ watch([stream, () => vadLoaded.value], async ([s, loaded]) => {
           :scale="scale"
         />
         <InteractiveArea v-if="!isMobile" h="85dvh" absolute right-4 flex flex-1 flex-col max-w="500px" min-w="30%" />
-        <MobileInteractiveArea v-if="isMobile" @settings-open="handleSettingsOpen" />
+        <MobileInteractiveArea v-if="isMobile" @settings-open="handleSettingsOpen">
+          <template #status>
+            <WebSocketStatusButton />
+          </template>
+        </MobileInteractiveArea>
       </div>
     </div>
     <VoiceTraceOverlay />

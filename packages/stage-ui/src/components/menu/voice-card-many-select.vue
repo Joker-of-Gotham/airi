@@ -4,6 +4,24 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import Alert from '../misc/alert.vue'
 import VoiceCard from './voice-card.vue'
 
+const props = withDefaults(defineProps<Props>(), {
+  columns: 2,
+  searchable: true,
+  searchPlaceholder: 'Search voices...',
+  searchNoResultsTitle: 'No voices found',
+  searchNoResultsDescription: 'Try a different search term',
+  searchResultsText: '{count} of {total} voices',
+  unsupportedVoiceWarningTitle: 'No voices',
+  unsupportedVoiceWarningContent: 'Try a different model or provider. We are working on supporting all the voice for this model as quickly as possible. If you need it urgently, please let us know on GitHub.',
+  customInputPlaceholder: 'Enter custom voice name',
+  expandButtonText: 'Show more',
+  collapseButtonText: 'Show less',
+  playButtonText: 'Play sample',
+  pauseButtonText: 'Pause',
+  showVisualizer: true,
+  listClass: '',
+})
+
 interface VoiceLanguage {
   name: string
   code: string
@@ -29,6 +47,7 @@ interface Voice {
 
 interface Props {
   voices: Voice[]
+  columns?: number
   searchable?: boolean
   searchPlaceholder?: string
   searchNoResultsTitle?: string
@@ -44,23 +63,6 @@ interface Props {
   showVisualizer?: boolean
   listClass?: string
 }
-
-const props = withDefaults(defineProps<Props>(), {
-  searchable: true,
-  searchPlaceholder: 'Search voices...',
-  searchNoResultsTitle: 'No voices found',
-  searchNoResultsDescription: 'Try a different search term',
-  searchResultsText: '{count} of {total} voices',
-  unsupportedVoiceWarningTitle: 'No voices',
-  unsupportedVoiceWarningContent: 'Try a different model or provider. We are working on supporting all the voice for this model as quickly as possible. If you need it urgently, please let us know on GitHub.',
-  customInputPlaceholder: 'Enter custom voice name',
-  expandButtonText: 'Show more',
-  collapseButtonText: 'Show less',
-  playButtonText: 'Play sample',
-  pauseButtonText: 'Pause',
-  showVisualizer: true,
-  listClass: '',
-})
 
 const isListExpanded = ref(false)
 const currentlyPlayingId = ref<string>()
@@ -111,6 +113,10 @@ const filteredVoices = computed(() => {
   })
 })
 
+const showExpandCollapseBtn = computed(() => {
+  return filteredVoices.value.length > props.columns
+})
+
 // Get preview URL from either field
 function getPreviewUrl(voice: Voice): string | undefined {
   return voice.previewURL || voice.preview_audio_url
@@ -127,7 +133,14 @@ function getAudioElement(voice: Voice): HTMLAudioElement | null {
   }
 
   const audio = new Audio(previewUrl)
-  audio.crossOrigin = 'anonymous' // This is crucial for CORS
+  // NOTICE: crossOrigin='anonymous' is only needed so Web Audio's
+  // createMediaElementSource can read samples for the visualizer. Setting it
+  // forces the browser to enforce CORS on the media fetch — if the preview
+  // host (e.g. Azure CDN) doesn't return Access-Control-Allow-Origin, the
+  // load is rejected with NotSupportedError. Skip it when the visualizer is
+  // off so plain playback works regardless of origin headers.
+  if (props.showVisualizer)
+    audio.crossOrigin = 'anonymous'
   audio.preload = 'auto' // Preload the audio
 
   audio.addEventListener('ended', () => {
@@ -341,9 +354,10 @@ const customVoiceName = ref('')
         <!-- Responsive grid container -->
         <div
           :class="[
+            'grid gap-4 mb-2',
             isListExpanded
-              ? 'grid grid-cols-1 md:grid-cols-2 gap-4'
-              : 'grid auto-cols-[min(300px,calc((100vw-5rem)/2))] grid-flow-col gap-4 overflow-x-auto scrollbar-none pb-2',
+              ? 'grid-cols-1 md:grid-cols-[repeat(var(--cols),minmax(0,1fr))] snap-y snap-proximity'
+              : 'grid-flow-col auto-cols-[calc((100%-(var(--cols)-1)*1rem)/var(--cols))] overflow-x-auto scrollbar-none snap-x snap-proximity',
             ...(props.listClass
               ? (typeof props.listClass === 'string'
                 ? [props.listClass]
@@ -355,7 +369,7 @@ const customVoiceName = ref('')
             ),
           ]"
           transition="all duration-200 ease-in-out"
-          :style="isListExpanded ? '' : 'scroll-snap-type: x mandatory;'"
+          :style="{ '--cols': props.columns }"
         >
           <!-- Not support voices warning -->
           <Alert v-if="!searchQuery && filteredVoices.length === 0" type="warning">
@@ -374,6 +388,7 @@ const customVoiceName = ref('')
             v-model:voice-id="voiceId"
             v-model:custom-voice-name="customVoiceName"
             name="voice"
+            class="snap-start"
             :voice="voice"
             :currently-playing-id="currentlyPlayingId"
             :custom-input-placeholder="customInputPlaceholder"
@@ -385,6 +400,7 @@ const customVoiceName = ref('')
 
         <!-- Expand/collapse handle -->
         <div
+          v-if="showExpandCollapseBtn"
           bg="neutral-100 dark:[rgba(0,0,0,0.3)]"
           rounded-xl
           :class="[

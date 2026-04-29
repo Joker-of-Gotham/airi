@@ -35,6 +35,16 @@ export function isModelProvider(providerInstance: ProviderInstance): providerIns
   return false
 }
 
+export interface ProviderOnboardingField {
+  key: string
+  type: 'text' | 'password'
+  label: string
+  description?: string
+  placeholder?: string
+  required?: boolean
+  defaultValue?: string
+}
+
 export interface ProviderExtraMethods<TConfig> {
   listModels?: (config: TConfig, provider: ProviderInstance) => Promise<ModelInfo[]>
   listVoices?: (config: TConfig, provider: ProviderInstance) => Promise<VoiceInfo[]>
@@ -46,6 +56,48 @@ export interface ProviderValidationResult {
   reason: string
   reasonKey: string
   valid: boolean
+}
+
+/**
+ * Validator ID fragment for the chat completions probe.
+ * Matched via `.includes()` against validator instance ids
+ * (e.g. `openai-compatible:check-chat-completions`).
+ */
+export const CHAT_COMPLETIONS_VALIDATOR_ID = 'check-chat-completions'
+
+export enum ProviderValidationCheck {
+  /** Lightweight GET to /models endpoint to check reachability (definition system) */
+  Connectivity = 'connectivity',
+  /** Fetch model list and verify non-empty */
+  ModelList = 'model_list',
+  /** Send generateText ping with fine-grained error handling and caching (definition system) */
+  ChatCompletions = 'chat_completions',
+  /**
+   * @deprecated
+   * Being used in builder system (a deprecated provider creation protocol),
+   * currently used by only OpenAI TTS && OpenAI Transcription.
+   * Send generateText ping with simple pass/fail, fallback to 'test' model (builder system)
+   */
+  Health = 'health',
+}
+
+export interface ProviderValidatorSchedule {
+  mode: 'once' | 'interval'
+  intervalMs?: number
+}
+
+export interface ProviderConfigValidator<TConfig> {
+  id: string
+  name: string
+  validator: (config: TConfig, contextOptions: { t: ComposerTranslation }) => MaybePromise<ProviderValidationResult>
+  schedule?: ProviderValidatorSchedule
+}
+
+export interface ProviderRuntimeValidator<TConfig> {
+  id: string
+  name: string
+  validator: (config: TConfig, provider: ProviderInstance, providerExtra: ProviderExtraMethods<TConfig>, contextOptions: { t: ComposerTranslation }) => MaybePromise<ProviderValidationResult>
+  schedule?: ProviderValidatorSchedule
 }
 
 export interface ModelInfo {
@@ -116,13 +168,20 @@ export interface ProviderDefinition<TConfig extends any = any> {
    */
   isAvailableBy?: () => Promise<boolean> | boolean
 
+  /**
+   * If false, the provider does not require user-provided credentials (e.g. API keys).
+   * Used for built-in providers that authenticate via JWT Bearer tokens.
+   */
+  requiresCredentials?: boolean
+
   createProviderConfig: (contextOptions: { t: ComposerTranslation }) => $ZodType<TConfig>
+  onboardingFields?: (ctx: { t: ComposerTranslation }) => ProviderOnboardingField[]
   createProvider: (config: TConfig) => ProviderInstance
   extraMethods?: ProviderExtraMethods<TConfig>
   validationRequiredWhen?: (config: TConfig) => boolean
   validators?: {
-    validateConfig?: Array<(contextOptions: { t: ComposerTranslation }) => { id: string, name: string, validator: (config: TConfig, contextOptions: { t: ComposerTranslation }) => MaybePromise<ProviderValidationResult> }>
-    validateProvider?: Array<(contextOptions: { t: ComposerTranslation }) => { id: string, name: string, validator: (config: TConfig, provider: ProviderInstance, providerExtra: ProviderExtraMethods<TConfig>, contextOptions: { t: ComposerTranslation }) => MaybePromise<ProviderValidationResult> }>
+    validateConfig?: Array<(contextOptions: { t: ComposerTranslation }) => ProviderConfigValidator<TConfig>>
+    validateProvider?: Array<(contextOptions: { t: ComposerTranslation }) => ProviderRuntimeValidator<TConfig>>
   }
   capabilities?: {
     transcription?: {
@@ -132,6 +191,16 @@ export interface ProviderDefinition<TConfig extends any = any> {
       streamInput: boolean
     }
   }
+  /**
+   * When true, hides the "skip chat ping check" checkbox in the UI even
+   * when the provider defines a ChatCompletions validator.
+   *
+   * By default, the checkbox is shown automatically whenever a provider
+   * includes a ChatCompletions runtime validator. Set this to `true` for
+   * providers where skipping that check is not meaningful or has not been
+   * verified yet.
+   */
+  disableChatPingCheckUI?: boolean
   business?: (contextOptions: { t: ComposerTranslation }) => {
     troubleshooting?: {
       validators?: {

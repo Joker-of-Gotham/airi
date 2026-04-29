@@ -21,12 +21,12 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: pnpm/action-setup@v3
+      - uses: pnpm/action-setup@v5
         with:
           run_install: false
 
       - name: Install Node.js 24.x
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: 24.x
           # registry-url required. Learn more at

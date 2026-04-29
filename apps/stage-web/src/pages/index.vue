@@ -11,6 +11,7 @@ import workletUrl from '@proj-airi/stage-ui/workers/vad/process.worklet?worker&u
 import { BackgroundProvider } from '@proj-airi/stage-layouts/components/Backgrounds'
 import { useBackgroundThemeColor } from '@proj-airi/stage-layouts/composables/theme-color'
 import { useBackgroundStore } from '@proj-airi/stage-layouts/stores/background'
+import { HoloCoupon } from '@proj-airi/stage-ui/components'
 import { WidgetStage } from '@proj-airi/stage-ui/components/scenes'
 import { useAudioRecorder } from '@proj-airi/stage-ui/composables/audio/audio-recorder'
 import { getVoiceTraceBusContext, voiceTraceLlmStartEvent } from '@proj-airi/stage-ui/services/voice-trace/bus'
@@ -48,7 +49,7 @@ const settingsAudioDeviceStore = useSettingsAudioDevice()
 const { stream, enabled } = storeToRefs(settingsAudioDeviceStore)
 const { startRecord, stopRecord, onStopRecord } = useAudioRecorder(stream)
 const hearingPipeline = useHearingSpeechInputPipeline()
-const { transcribeForRecording } = hearingPipeline
+const { transcribeForMediaStream, transcribeForRecording } = hearingPipeline
 const { supportsStreamInput } = storeToRefs(hearingPipeline)
 const providersStore = useProvidersStore()
 const consciousnessStore = useConsciousnessStore()
@@ -229,6 +230,7 @@ watch([stream, () => vadLoaded.value], async ([s, loaded]) => {
         <InteractiveArea v-if="!isMobile" h="85dvh" absolute right-4 flex flex-1 flex-col max-w="500px" min-w="30%" />
         <MobileInteractiveArea v-if="isMobile" @settings-open="handleSettingsOpen" />
       </div>
+      <HoloCoupon />
     </div>
     <!-- Devtools overlay: independent UI, reads only BroadcastChannel/Eventa signals -->
     <VoiceTraceOverlay />

@@ -3,59 +3,113 @@ import type { DisplayModel } from '../display-models'
 import { useLocalStorageManualReset } from '@proj-airi/stage-shared/composables'
 import { refManualReset, useEventListener } from '@vueuse/core'
 import { defineStore } from 'pinia'
+import { computed, watch } from 'vue'
 
 import { DisplayModelFormat, useDisplayModelsStore } from '../display-models'
 
+export type StageModelRenderer = 'live2d' | 'vrm' | 'godot' | 'disabled' | undefined
+type BuiltInStageModelRenderer = Exclude<StageModelRenderer, 'godot'>
+
 export const useSettingsStageModel = defineStore('settings-stage-model', () => {
   const displayModelsStore = useDisplayModelsStore()
+  let stageModelUpdateSequence = 0
+  const stageModelStorageKey = 'settings/stage/model'
 
-  const stageModelSelected = useLocalStorageManualReset<string>('settings/stage/model', 'preset-live2d-1')
+  const stageModelSelectedState = useLocalStorageManualReset<string>(stageModelStorageKey, 'preset-live2d-1')
+  const stageModelSelected = computed<string>({
+    get: () => stageModelSelectedState.value,
+    set: (value) => {
+      stageModelSelectedState.value = value
+    },
+  })
   const stageModelSelectedDisplayModel = refManualReset<DisplayModel | undefined>(undefined)
   const stageModelSelectedUrl = refManualReset<string | undefined>(undefined)
-  const stageModelRenderer = refManualReset<'live2d' | 'vrm' | 'disabled' | undefined>(undefined)
+  const stageModelRenderer = refManualReset<StageModelRenderer>(undefined)
+  const stageModelBuiltInRenderer = refManualReset<BuiltInStageModelRenderer>(undefined)
 
   const stageViewControlsEnabled = refManualReset<boolean>(false)
 
-  async function updateStageModel() {
-    if (!stageModelSelected.value) {
-      stageModelSelectedUrl.value = undefined
-      stageModelSelectedDisplayModel.value = undefined
-      stageModelRenderer.value = 'disabled'
-      return
-    }
+  function revokeStageModelUrl(url?: string) {
+    if (url?.startsWith('blob:'))
+      URL.revokeObjectURL(url)
+  }
 
-    const model = await displayModelsStore.getDisplayModel(stageModelSelected.value)
-    if (!model) {
-      stageModelSelectedUrl.value = undefined
-      stageModelSelectedDisplayModel.value = undefined
-      stageModelRenderer.value = 'disabled'
+  function replaceStageModelUrl(nextUrl?: string) {
+    if (stageModelSelectedUrl.value === nextUrl)
       return
+
+    revokeStageModelUrl(stageModelSelectedUrl.value)
+    stageModelSelectedUrl.value = nextUrl
+  }
+
+  function resolveBuiltInStageModelRenderer(model?: DisplayModel): BuiltInStageModelRenderer {
+    if (!model) {
+      return 'disabled'
     }
 
     switch (model.format) {
       case DisplayModelFormat.Live2dZip:
-        stageModelRenderer.value = 'live2d'
-        break
+        return 'live2d'
       case DisplayModelFormat.VRM:
-        stageModelRenderer.value = 'vrm'
-        break
+        return 'vrm'
       default:
-        stageModelRenderer.value = 'disabled'
-        break
+        return 'disabled'
     }
+  }
+
+  async function updateStageModel() {
+    const requestId = ++stageModelUpdateSequence
+    const selectedModelId = stageModelSelectedState.value
+
+    if (!selectedModelId) {
+      replaceStageModelUrl(undefined)
+      stageModelSelectedDisplayModel.value = undefined
+      stageModelBuiltInRenderer.value = 'disabled'
+      if (stageModelRenderer.value !== 'godot')
+        stageModelRenderer.value = 'disabled'
+      return
+    }
+
+    const model = await displayModelsStore.getDisplayModel(selectedModelId)
+    if (requestId !== stageModelUpdateSequence)
+      return
+
+    if (!model) {
+      replaceStageModelUrl(undefined)
+      stageModelSelectedDisplayModel.value = undefined
+      stageModelBuiltInRenderer.value = 'disabled'
+      if (stageModelRenderer.value !== 'godot')
+        stageModelRenderer.value = 'disabled'
+      return
+    }
+
+    const builtInRenderer = resolveBuiltInStageModelRenderer(model)
+    stageModelBuiltInRenderer.value = builtInRenderer
+    if (stageModelRenderer.value !== 'godot')
+      stageModelRenderer.value = builtInRenderer
 
     if (model.type === 'file') {
-      if (stageModelSelectedUrl.value) {
-        URL.revokeObjectURL(stageModelSelectedUrl.value)
+      const nextUrl = URL.createObjectURL(model.file)
+      if (requestId !== stageModelUpdateSequence) {
+        URL.revokeObjectURL(nextUrl)
+        return
       }
 
-      stageModelSelectedUrl.value = URL.createObjectURL(model.file)
+      replaceStageModelUrl(nextUrl)
     }
     else {
-      stageModelSelectedUrl.value = model.url
+      replaceStageModelUrl(model.url)
     }
 
     stageModelSelectedDisplayModel.value = model
+  }
+
+  function setStageModelRenderer(renderer: StageModelRenderer) {
+    stageModelRenderer.value = renderer
+  }
+
+  function restoreBuiltInStageModelRenderer() {
+    stageModelRenderer.value = stageModelBuiltInRenderer.value ?? 'disabled'
   }
 
   async function initializeStageModel() {
@@ -63,19 +117,21 @@ export const useSettingsStageModel = defineStore('settings-stage-model', () => {
   }
 
   useEventListener('unload', () => {
-    if (stageModelSelectedUrl.value) {
-      URL.revokeObjectURL(stageModelSelectedUrl.value)
-    }
+    revokeStageModelUrl(stageModelSelectedUrl.value)
+  })
+
+  watch(stageModelSelectedState, (_newValue, _oldValue) => {
+    void updateStageModel()
   })
 
   async function resetState() {
-    if (stageModelSelectedUrl.value)
-      URL.revokeObjectURL(stageModelSelectedUrl.value)
+    revokeStageModelUrl(stageModelSelectedUrl.value)
 
-    stageModelSelected.reset()
+    stageModelSelectedState.reset()
     stageModelSelectedDisplayModel.reset()
     stageModelSelectedUrl.reset()
     stageModelRenderer.reset()
+    stageModelBuiltInRenderer.reset()
     stageViewControlsEnabled.reset()
 
     await updateStageModel()
@@ -89,6 +145,8 @@ export const useSettingsStageModel = defineStore('settings-stage-model', () => {
     stageViewControlsEnabled,
 
     initializeStageModel,
+    restoreBuiltInStageModelRenderer,
+    setStageModelRenderer,
     updateStageModel,
     resetState,
   }

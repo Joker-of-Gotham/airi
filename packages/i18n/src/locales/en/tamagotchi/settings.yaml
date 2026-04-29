@@ -25,7 +25,7 @@ pages:
       sections:
         section:
           use-window-mouse:
-            title: useWindowMouse
+            title: useWindowMouse Tool
             description: Test the Electron window cursor position
 devtools:
   title: Developer
@@ -40,6 +40,8 @@ devtools:
     markdown-stress:
       title: Markdown Stress
       description: Stress markdown parsing and rendering with heavy chat payloads
+    io-tracer:
+      title: IO Tracer
     widgets-calling:
       title: Widget Calling
 

@@ -1,10 +1,20 @@
 <script setup lang="ts">
 import type { Card } from '@proj-airi/ccc'
+import type { AiriExtension } from '@proj-airi/stage-ui/stores/modules/airi-card'
 
 import kebabcase from '@stdlib/string-base-kebabcase'
 
+import { DEFAULT_ARTISTRY_WIDGET_INSTRUCTION } from '@proj-airi/stage-ui/constants/prompts/artistry-instruction'
+import { useDisplayModelsStore } from '@proj-airi/stage-ui/stores/display-models'
 import { useAiriCardStore } from '@proj-airi/stage-ui/stores/modules/airi-card'
+import { useArtistryStore } from '@proj-airi/stage-ui/stores/modules/artistry'
+import { useConsciousnessStore } from '@proj-airi/stage-ui/stores/modules/consciousness'
+import { useSpeechStore } from '@proj-airi/stage-ui/stores/modules/speech'
+import { useProvidersStore } from '@proj-airi/stage-ui/stores/providers'
+import { useSettingsStageModel } from '@proj-airi/stage-ui/stores/settings/stage-model'
 import { Button, FieldInput, FieldValues } from '@proj-airi/ui'
+import { ComboboxSelect } from '@proj-airi/ui/components/form'
+import { storeToRefs } from 'pinia'
 import {
   DialogContent,
   DialogOverlay,
@@ -15,9 +25,27 @@ import {
 import { computed, ref, toRaw, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
+import CardCreationTabArtistry from './tabs/CardCreationTabArtistry.vue'
+
 interface Props {
   modelValue: boolean
   cardId?: string // If provided, edit mode; otherwise create mode
+  initialTab?: string
+}
+
+interface LegacyArtistrySettings {
+  provider?: string
+  model?: string
+  promptPrefix?: string
+  widgetInstruction?: string
+  options?: Record<string, unknown>
+}
+
+type AiriExtensionWithLegacyArtistry = AiriExtension & {
+  artistry?: LegacyArtistrySettings
+  modules?: AiriExtension['modules'] & {
+    artistry?: LegacyArtistrySettings
+  }
 }
 
 const props = defineProps<Props>()
@@ -29,9 +57,159 @@ const modelValue = defineModel<boolean>()
 
 const { t } = useI18n()
 const cardStore = useAiriCardStore()
+const consciousnessStore = useConsciousnessStore()
+const speechStore = useSpeechStore()
+const providersStore = useProvidersStore()
+const displayModelsStore = useDisplayModelsStore()
+const stageModelStore = useSettingsStageModel()
+const artistryStore = useArtistryStore()
+
+const { activeProvider: consciousnessProvider, activeModel: defaultConsciousnessModel } = storeToRefs(consciousnessStore)
+const { activeSpeechProvider: speechProvider, activeSpeechModel: defaultSpeechModel, activeSpeechVoiceId: defaultSpeechVoiceId } = storeToRefs(speechStore)
+const { displayModels } = storeToRefs(displayModelsStore)
+const { stageModelSelected: defaultDisplayModelId } = storeToRefs(stageModelStore)
+const { activeProvider: defaultArtistryProvider } = storeToRefs(artistryStore)
 
 // Determine if we're in edit mode
 const isEditMode = computed(() => !!props.cardId)
+
+// Modules configuration
+const selectedConsciousnessProvider = ref<string>('')
+const selectedConsciousnessModel = ref<string>('')
+const selectedSpeechProvider = ref<string>('')
+const selectedSpeechModel = ref<string>('')
+const selectedSpeechVoiceId = ref<string>('')
+const selectedDisplayModelId = ref<string>('')
+
+// Artistry configuration
+const selectedArtistryProvider = ref<string>('')
+const selectedArtistryModel = ref<string>('')
+const selectedArtistryPromptPrefix = ref<string>('')
+const selectedArtistryWidgetInstruction = ref<string>('')
+const selectedArtistrySpawnMode = ref<'bg' | 'widget' | 'inline' | 'bg_widget'>('bg_widget')
+const selectedArtistryAutonomousEnabled = ref<boolean>(false)
+const selectedArtistryAutonomousThreshold = ref<number>(70)
+const selectedArtistryConfigStr = ref<string>('{\n  \n}')
+
+// Computed: available display model options
+const displayModelOptions = computed(() =>
+  displayModels.value.map(model => ({
+    value: model.id,
+    label: model.name,
+  })),
+)
+
+// Computed: available consciousness provider options
+const consciousnessProviderOptions = computed(() => {
+  return providersStore.configuredChatProvidersMetadata.map(provider => ({
+    value: provider.id,
+    label: provider.localizedName || provider.name,
+  }))
+})
+
+// Computed: available consciousness models options
+const consciousnessModelOptions = computed(() => {
+  const provider = selectedConsciousnessProvider.value || consciousnessProvider.value
+  if (!provider)
+    return []
+  const models = providersStore.getModelsForProvider(provider)
+  return models.map(model => ({
+    value: model.id,
+    label: model.name || model.id,
+  }))
+})
+
+// Computed: available speech provider options
+const speechProviderOptions = computed(() => {
+  return providersStore.configuredSpeechProvidersMetadata.map(provider => ({
+    value: provider.id,
+    label: provider.localizedName || provider.name,
+  }))
+})
+
+// Computed: available speech models options
+const speechModelOptions = computed(() => {
+  const provider = selectedSpeechProvider.value || speechProvider.value
+  if (!provider)
+    return []
+  const models = providersStore.getModelsForProvider(provider)
+  return models.map(model => ({
+    value: model.id,
+    label: model.name || model.id,
+  }))
+})
+
+// Computed: available speech voices options
+const speechVoiceOptions = computed(() => {
+  const provider = selectedSpeechProvider.value || speechProvider.value
+  if (!provider)
+    return []
+  const voices = speechStore.getVoicesForProvider(provider)
+  return voices.map(voice => ({
+    value: voice.id,
+    label: voice.name || voice.id,
+  }))
+})
+
+// Computed: available artistry provider options
+const artistryProviderOptions = computed(() => {
+  return [
+    { value: 'none', label: 'None (Disabled)' },
+    { value: 'replicate', label: 'Replicate' },
+    { value: 'comfyui', label: 'ComfyUI' },
+    { value: 'nanobanana', label: 'Nano Banana' },
+  ]
+})
+
+// Load models for current providers on init
+watch(() => [consciousnessProvider.value, speechProvider.value], async ([consProvider, spProvider]) => {
+  if (consProvider) {
+    await consciousnessStore.loadModelsForProvider(consProvider)
+  }
+  if (spProvider) {
+    await speechStore.loadVoicesForProvider(spProvider)
+    const metadata = providersStore.getProviderMetadata(spProvider)
+    if (metadata?.capabilities.listModels) {
+      await providersStore.fetchModelsForProvider(spProvider)
+    }
+  }
+}, { immediate: true })
+
+// Watch consciousness provider changes and reload models
+watch(selectedConsciousnessProvider, async (newProvider, oldProvider) => {
+  if (oldProvider !== undefined && newProvider !== oldProvider && newProvider) {
+    await consciousnessStore.loadModelsForProvider(newProvider)
+    // Reset model selection to default or empty
+    selectedConsciousnessModel.value = ''
+  }
+})
+
+// Watch speech provider changes and reload models/voices
+watch(selectedSpeechProvider, async (newProvider, oldProvider) => {
+  if (oldProvider !== undefined && newProvider !== oldProvider && newProvider) {
+    await speechStore.loadVoicesForProvider(newProvider)
+    const metadata = providersStore.getProviderMetadata(newProvider)
+    if (metadata?.capabilities.listModels) {
+      await providersStore.fetchModelsForProvider(newProvider)
+    }
+    // Reset model and voice selection
+    selectedSpeechModel.value = ''
+    selectedSpeechVoiceId.value = ''
+  }
+})
+
+// Reset voice when speech model changes (different models may have different voices)
+watch(selectedSpeechModel, async (newModel, oldModel) => {
+  // Only reset if model actually changed and we're not initializing
+  const provider = selectedSpeechProvider.value || speechProvider.value
+  if (oldModel !== undefined && newModel !== oldModel && provider) {
+    // Reload voices for the current provider
+    await speechStore.loadVoicesForProvider(provider)
+
+    // Reset voice selection to default
+    selectedSpeechVoiceId.value = defaultSpeechVoiceId.value || ''
+  }
+})
 
 // Tab type definition
 interface Tab {
@@ -47,6 +225,8 @@ const activeTabId = ref('')
 const tabs: Tab[] = [
   { id: 'identity', label: t('settings.pages.card.creation.identity'), icon: 'i-solar:emoji-funny-square-bold-duotone' },
   { id: 'behavior', label: t('settings.pages.card.creation.behavior'), icon: 'i-solar:chat-round-line-bold-duotone' },
+  { id: 'modules', label: t('settings.pages.card.modules'), icon: 'i-solar:widget-4-bold-duotone' },
+  { id: 'artistry', label: t('settings.pages.modules.artistry.title'), icon: 'i-solar:gallery-bold-duotone' },
   { id: 'settings', label: t('settings.pages.card.creation.settings'), icon: 'i-solar:settings-bold-duotone' },
 ]
 
@@ -54,13 +234,26 @@ const tabs: Tab[] = [
 const activeTab = computed({
   get: () => {
     // If current active tab is not in available tabs, reset to first tab
-    if (!tabs.find(tab => tab.id === activeTabId.value))
+    if (!tabs.some(tab => tab.id === activeTabId.value)) {
+      if (props.initialTab && tabs.some(tab => tab.id === props.initialTab))
+        return props.initialTab
       return tabs[0]?.id || ''
+    }
     return activeTabId.value
   },
   set: (value: string) => {
     activeTabId.value = value
   },
+})
+
+// Reset active tab when dialog opens
+watch(() => props.modelValue, (isOpen) => {
+  if (isOpen) {
+    if (props.initialTab && tabs.some(tab => tab.id === props.initialTab))
+      activeTabId.value = props.initialTab
+    else
+      activeTabId.value = '' // Let computed handle default
+  }
 })
 
 // Check for errors, and save built Cards :
@@ -72,7 +265,7 @@ function saveCard(card: Card): boolean {
   // Before saving, let's validate what the user entered :
   const rawCard: Card = toRaw(card)
 
-  if (!(rawCard.name!.length > 0)) { // ! is used, since a default value is provided, and computed values passed to v-model should never be undefined
+  if (!((rawCard.name?.length ?? 0) > 0)) {
     // No name
     showError.value = true
     errorMessage.value = t('settings.pages.card.creation.errors.name')
@@ -84,45 +277,105 @@ function saveCard(card: Card): boolean {
     errorMessage.value = t('settings.pages.card.creation.errors.version')
     return false
   }
-  else if (!(rawCard.description!.length > 0)) {
+  else if (!((rawCard.description?.length ?? 0) > 0)) {
     // No description
     showError.value = true
     errorMessage.value = t('settings.pages.card.creation.errors.description')
     return false
   }
-  else if (!(rawCard.personality!.length > 0)) {
+  else if (!((rawCard.personality?.length ?? 0) > 0)) {
     // No personality
     showError.value = true
     errorMessage.value = t('settings.pages.card.creation.errors.personality')
     return false
   }
-  else if (!(rawCard.scenario!.length > 0)) {
+  else if (!((rawCard.scenario?.length ?? 0) > 0)) {
     // No Scenario
     showError.value = true
     errorMessage.value = t('settings.pages.card.creation.errors.scenario')
     return false
   }
-  else if (!(rawCard.systemPrompt!.length > 0)) {
+  else if (!((rawCard.systemPrompt?.length ?? 0) > 0)) {
     // No sys prompt
     showError.value = true
     errorMessage.value = t('settings.pages.card.creation.errors.systemprompt')
     return false
   }
-  else if (!(rawCard.postHistoryInstructions!.length > 0)) {
+  else if (!((rawCard.postHistoryInstructions?.length ?? 0) > 0)) {
     // No post history prompt
     showError.value = true
     errorMessage.value = t('settings.pages.card.creation.errors.posthistoryinstructions')
     return false
   }
+
+  // Validate Artistry JSON if provided
+  if (selectedArtistryConfigStr.value.trim()) {
+    try {
+      const parsed = JSON.parse(selectedArtistryConfigStr.value)
+      if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+        throw new Error('Not an object')
+      }
+    }
+    catch {
+      showError.value = true
+      errorMessage.value = t('settings.pages.card.creation.errors.invalid_artistry_json')
+      return false
+    }
+  }
+
   showError.value = false
 
+  // Build options with final safety parse
+  let artistryOptions: Record<string, any> | undefined
+  if (selectedArtistryConfigStr.value.trim()) {
+    try {
+      artistryOptions = JSON.parse(selectedArtistryConfigStr.value)
+    }
+    catch {
+      // Should not happen due to validation above
+      artistryOptions = undefined
+    }
+  }
+
+  // Build card with modules extension
+  const cardWithModules = {
+    ...rawCard,
+    extensions: {
+      ...rawCard.extensions,
+      airi: {
+        modules: {
+          consciousness: {
+            provider: selectedConsciousnessProvider.value || consciousnessProvider.value,
+            model: selectedConsciousnessModel.value || defaultConsciousnessModel.value,
+          },
+          speech: {
+            provider: selectedSpeechProvider.value || speechProvider.value,
+            model: selectedSpeechModel.value || defaultSpeechModel.value,
+            voice_id: selectedSpeechVoiceId.value || defaultSpeechVoiceId.value,
+          },
+          displayModelId: selectedDisplayModelId.value || defaultDisplayModelId.value,
+          artistry: {
+            provider: selectedArtistryProvider.value || defaultArtistryProvider.value,
+            model: selectedArtistryModel.value,
+            promptPrefix: selectedArtistryPromptPrefix.value,
+            widgetInstruction: selectedArtistryWidgetInstruction.value,
+            spawnMode: selectedArtistrySpawnMode.value,
+            options: artistryOptions,
+            autonomousEnabled: selectedArtistryAutonomousEnabled.value,
+            autonomousThreshold: selectedArtistryAutonomousThreshold.value,
+          },
+        },
+        agents: {},
+      } as AiriExtension,
+    },
+  }
   if (isEditMode.value && props.cardId) {
     // Edit mode: update existing card
-    cardStore.updateCard(props.cardId, rawCard)
+    cardStore.updateCard(props.cardId, cardWithModules)
   }
   else {
     // Create mode: add new card
-    cardStore.addCard(rawCard)
+    cardStore.addCard(cardWithModules)
   }
 
   modelValue.value = false // Close this
@@ -133,14 +386,40 @@ function saveCard(card: Card): boolean {
 
 // Initialize card data - load from existing card if in edit mode
 function initializeCard(): Card {
-  if (isEditMode.value && props.cardId) {
-    const existingCard = cardStore.getCard(props.cardId)
-    if (existingCard) {
-      return { ...toRaw(existingCard) }
-    }
+  // Extract existing card data if in edit mode
+  const existingCard = (isEditMode.value && props.cardId) ? cardStore.getCard(props.cardId) : undefined
+  const airiExt = existingCard?.extensions?.airi as AiriExtensionWithLegacyArtistry | undefined
+
+  // Initialize module selections with fallback logic (handles all cases: create, edit with/without extension)
+  selectedConsciousnessProvider.value = airiExt?.modules?.consciousness?.provider || consciousnessProvider.value
+  selectedConsciousnessModel.value = airiExt?.modules?.consciousness?.model || defaultConsciousnessModel.value
+  selectedSpeechProvider.value = airiExt?.modules?.speech?.provider || speechProvider.value
+  selectedSpeechModel.value = airiExt?.modules?.speech?.model || defaultSpeechModel.value
+  selectedSpeechVoiceId.value = airiExt?.modules?.speech?.voice_id || defaultSpeechVoiceId.value
+  selectedDisplayModelId.value = airiExt?.modules?.displayModelId || defaultDisplayModelId.value
+
+  // NOTICE: keep legacy `extensions.airi.artistry` fallback so existing cards continue to load.
+  const artistrySettings = airiExt?.modules?.artistry || airiExt?.artistry
+  selectedArtistryProvider.value = artistrySettings?.provider || defaultArtistryProvider.value
+  selectedArtistryModel.value = artistrySettings?.model || ''
+  selectedArtistryPromptPrefix.value = artistrySettings?.promptPrefix || ''
+  selectedArtistryWidgetInstruction.value = artistrySettings?.widgetInstruction || DEFAULT_ARTISTRY_WIDGET_INSTRUCTION
+  selectedArtistrySpawnMode.value = (artistrySettings as any)?.spawnMode || 'bg_widget'
+  selectedArtistryAutonomousEnabled.value = (artistrySettings as any)?.autonomousEnabled ?? false
+  selectedArtistryAutonomousThreshold.value = (artistrySettings as any)?.autonomousThreshold ?? 70
+
+  try {
+    selectedArtistryConfigStr.value = artistrySettings?.options ? JSON.stringify(artistrySettings.options, null, 2) : '{\n  \n}'
+  }
+  catch {
+    selectedArtistryConfigStr.value = '{\n  \n}'
   }
 
-  // Default values for create mode
+  // Return existing card data or defaults
+  if (existingCard) {
+    return { ...toRaw(existingCard) }
+  }
+
   return {
     name: t('settings.pages.card.creation.defaults.name'),
     nickname: undefined,
@@ -202,13 +481,20 @@ const cardGreetings = computed({
 const cardVersion = makeComputed('version')
 const cardSystemPrompt = makeComputed('systemPrompt')
 const cardPostHistoryInstructions = makeComputed('postHistoryInstructions')
+
+// Helper function to generate placeholder text for default values
+function getDefaultPlaceholder(defaultValue: string | undefined): string {
+  return defaultValue
+    ? `${t('settings.pages.card.creation.use_default')} (${defaultValue})`
+    : t('settings.pages.card.creation.use_default_not_configured')
+}
 </script>
 
 <template>
   <DialogRoot :open="modelValue" @update:open="emit('update:modelValue', $event)">
     <DialogPortal>
       <DialogOverlay class="fixed inset-0 z-100 bg-black/50 backdrop-blur-sm data-[state=closed]:animate-fadeOut data-[state=open]:animate-fadeIn" />
-      <DialogContent class="fixed left-1/2 top-1/2 z-100 m-0 max-h-[90vh] max-w-6xl w-[92vw] flex flex-col overflow-auto border border-neutral-200 rounded-xl bg-white p-5 shadow-xl 2xl:w-[60vw] lg:w-[80vw] md:w-[85vw] xl:w-[70vw] -translate-x-1/2 -translate-y-1/2 data-[state=closed]:animate-contentHide data-[state=open]:animate-contentShow dark:border-neutral-700 dark:bg-neutral-800 sm:p-6">
+      <DialogContent class="fixed left-1/2 top-1/2 z-100 m-0 max-h-[90vh] max-w-6xl w-[92vw] flex flex-col overflow-auto border border-neutral-200 rounded-xl bg-white p-5 shadow-xl 2xl:w-[60vw] lg:w-[80vw] md:w-[85vw] xl:w-[70vw] -translate-x-1/2 -translate-y-1/2 data-[state=closed]:animate-contentHide data-[state=open]:animate-contentShow dark:border-neutral-700 dark:bg-neutral-800 sm:p-6" @interact-outside.prevent>
         <div class="w-full flex flex-col gap-5">
           <DialogTitle text-2xl font-normal class="from-primary-500 to-primary-400 bg-gradient-to-r bg-clip-text text-transparent">
             {{ isEditMode ? t("settings.pages.card.edit_card") : t("settings.pages.card.create_card") }}
@@ -267,6 +553,101 @@ const cardPostHistoryInstructions = makeComputed('postHistoryInstructions')
               <FieldValues v-model="cardGreetings" :label="t('settings.pages.card.creation.greetings')" :description="t('settings.pages.card.creation.fields_info.greetings')" />
             </div>
           </div>
+          <!-- Modules -->
+          <div v-else-if="activeTab === 'modules'" class="tab-content ml-auto mr-auto w-95%">
+            <p class="mb-3">
+              {{ t('settings.pages.card.creation.modules_info') }}
+            </p>
+
+            <div :class="['grid', 'grid-cols-1', 'sm:grid-cols-2', 'gap-4', 'ml-auto', 'mr-auto', 'w-90%']">
+              <!-- Consciousness Provider -->
+              <div :class="['flex', 'flex-col', 'gap-2']">
+                <label :class="['flex', 'flex-row', 'items-center', 'gap-2', 'text-sm', 'text-neutral-500', 'dark:text-neutral-400']">
+                  <div i-lucide:brain />
+                  {{ t('settings.pages.card.chat.provider') }}
+                </label>
+                <ComboboxSelect
+                  v-model="selectedConsciousnessProvider"
+                  :options="consciousnessProviderOptions"
+                  :placeholder="getDefaultPlaceholder(consciousnessProvider)"
+                  class="w-full"
+                />
+              </div>
+
+              <!-- Consciousness Model -->
+              <div :class="['flex', 'flex-col', 'gap-2']">
+                <label :class="['flex', 'flex-row', 'items-center', 'gap-2', 'text-sm', 'text-neutral-500', 'dark:text-neutral-400']">
+                  <div i-lucide:ghost />
+                  {{ t('settings.pages.card.consciousness.model') }}
+                </label>
+                <ComboboxSelect
+                  v-model="selectedConsciousnessModel"
+                  :options="consciousnessModelOptions"
+                  :placeholder="getDefaultPlaceholder(defaultConsciousnessModel)"
+                  :disabled="!selectedConsciousnessProvider && !consciousnessProvider"
+                  class="w-full"
+                />
+              </div>
+
+              <!-- Speech Provider -->
+              <div :class="['flex', 'flex-col', 'gap-2']">
+                <label :class="['flex', 'flex-row', 'items-center', 'gap-2', 'text-sm', 'text-neutral-500', 'dark:text-neutral-400']">
+                  <div i-lucide:radio />
+                  {{ t('settings.pages.card.speech.provider') }}
+                </label>
+                <ComboboxSelect
+                  v-model="selectedSpeechProvider"
+                  :options="speechProviderOptions"
+                  :placeholder="getDefaultPlaceholder(speechProvider)"
+                  class="w-full"
+                />
+              </div>
+
+              <!-- Speech Model -->
+              <div :class="['flex', 'flex-col', 'gap-2']">
+                <label :class="['flex', 'flex-row', 'items-center', 'gap-2', 'text-sm', 'text-neutral-500', 'dark:text-neutral-400']">
+                  <div i-lucide:mic />
+                  {{ t('settings.pages.card.speech.model') }}
+                </label>
+                <ComboboxSelect
+                  v-model="selectedSpeechModel"
+                  :options="speechModelOptions"
+                  :placeholder="getDefaultPlaceholder(defaultSpeechModel)"
+                  :disabled="!selectedSpeechProvider && !speechProvider"
+                  class="w-full"
+                />
+              </div>
+
+              <!-- Speech Voice -->
+              <div :class="['flex', 'flex-col', 'gap-2']">
+                <label :class="['flex', 'flex-row', 'items-center', 'gap-2', 'text-sm', 'text-neutral-500', 'dark:text-neutral-400']">
+                  <div i-lucide:music />
+                  {{ t('settings.pages.card.speech.voice') }}
+                </label>
+                <ComboboxSelect
+                  v-model="selectedSpeechVoiceId"
+                  :options="speechVoiceOptions"
+                  :placeholder="getDefaultPlaceholder(defaultSpeechVoiceId)"
+                  :disabled="!selectedSpeechProvider && !speechProvider"
+                  class="w-full"
+                />
+              </div>
+
+              <!-- Display Model (Body) -->
+              <div :class="['flex', 'flex-col', 'gap-2', 'sm:col-span-2']">
+                <label :class="['flex', 'flex-row', 'items-center', 'gap-2', 'text-sm', 'text-neutral-500', 'dark:text-neutral-400']">
+                  <div i-solar:ghost-bold-duotone />
+                  {{ t('settings.pages.card.body-model') }}
+                </label>
+                <ComboboxSelect
+                  v-model="selectedDisplayModelId"
+                  :options="displayModelOptions"
+                  :placeholder="getDefaultPlaceholder(defaultDisplayModelId)"
+                  class="w-full"
+                />
+              </div>
+            </div>
+          </div>
           <!-- Settings -->
           <div v-else-if="activeTab === 'settings'" class="tab-content ml-auto mr-auto w-95%">
             <div class="input-list ml-auto mr-auto w-90% flex flex-row flex-wrap justify-center gap-8">
@@ -275,6 +656,20 @@ const cardPostHistoryInstructions = makeComputed('postHistoryInstructions')
               <FieldInput v-model="cardVersion" :label="t('settings.pages.card.creation.version')" :required="true" :description="t('settings.pages.card.creation.fields_info.version')" />
             </div>
           </div>
+          <!-- Artistry -->
+          <CardCreationTabArtistry
+            v-else-if="activeTab === 'artistry'"
+            v-model:selected-artistry-provider="selectedArtistryProvider"
+            v-model:selected-artistry-model="selectedArtistryModel"
+            v-model:selected-artistry-prompt-prefix="selectedArtistryPromptPrefix"
+            v-model:selected-artistry-widget-instruction="selectedArtistryWidgetInstruction"
+            v-model:selected-artistry-autonomous-enabled="selectedArtistryAutonomousEnabled"
+            v-model:selected-artistry-autonomous-threshold="selectedArtistryAutonomousThreshold"
+            v-model:selected-artistry-spawn-mode="selectedArtistrySpawnMode"
+            v-model:selected-artistry-config-str="selectedArtistryConfigStr"
+            :artistry-provider-options="artistryProviderOptions"
+            :default-artistry-provider-placeholder="getDefaultPlaceholder(defaultArtistryProvider)"
+          />
 
           <div class="ml-auto mr-1 flex flex-row gap-2">
             <Button

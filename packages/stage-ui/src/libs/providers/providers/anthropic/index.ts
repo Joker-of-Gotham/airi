@@ -3,7 +3,8 @@ import type { ModelInfo } from '../../types'
 import { createChatProvider, createModelProvider, merge } from '@xsai-ext/providers/utils'
 import { z } from 'zod'
 
-import { createOpenAICompatibleValidators } from '../../validators/openai-compatible'
+import { ProviderValidationCheck } from '../../types'
+import { createOpenAICompatibleValidators } from '../../validators'
 import { defineProvider } from '../registry'
 
 const anthropicConfigSchema = z.object({
@@ -38,7 +39,7 @@ function createAnthropic(apiKey: string, baseURL: string = 'https://api.anthropi
 
 export const providerAnthropic = defineProvider<AnthropicConfig>({
   id: 'anthropic',
-  order: 5,
+  order: 6,
   name: 'Anthropic',
   nameLocalize: ({ t }) => t('settings.pages.providers.provider.anthropic.title'),
   description: 'anthropic.com',
@@ -91,7 +92,7 @@ export const providerAnthropic = defineProvider<AnthropicConfig>({
   },
   validators: {
     ...createOpenAICompatibleValidators({
-      checks: ['connectivity'],
+      checks: [ProviderValidationCheck.Connectivity, ProviderValidationCheck.ChatCompletions],
       additionalHeaders: {
         'anthropic-dangerous-direct-browser-access': 'true',
       },

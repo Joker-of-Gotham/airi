@@ -1,7 +1,8 @@
 import { createGoogleGenerativeAI } from '@xsai-ext/providers/create'
 import { z } from 'zod'
 
-import { createOpenAICompatibleValidators } from '../../validators/openai-compatible'
+import { ProviderValidationCheck } from '../../types'
+import { createOpenAICompatibleValidators } from '../../validators'
 import { defineProvider } from '../registry'
 
 const googleGenerativeConfigSchema = z.object({
@@ -17,7 +18,7 @@ type GoogleGenerativeConfig = z.input<typeof googleGenerativeConfigSchema>
 
 export const providerGoogleGenerativeAI = defineProvider<GoogleGenerativeConfig>({
   id: 'google-generative-ai',
-  order: 6,
+  order: 8,
   name: 'Google Gemini',
   nameLocalize: ({ t }) => t('settings.pages.providers.provider.google-generative-ai.title'),
   description: 'ai.google.dev',
@@ -48,7 +49,7 @@ export const providerGoogleGenerativeAI = defineProvider<GoogleGenerativeConfig>
   },
   validators: {
     ...createOpenAICompatibleValidators({
-      checks: ['connectivity', 'model_list'],
+      checks: [ProviderValidationCheck.Connectivity, ProviderValidationCheck.ModelList, ProviderValidationCheck.ChatCompletions],
     }),
   },
 })
